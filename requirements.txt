@@ -1,0 +1,14 @@
+# Code formatting and style
+autopep8
+
+# Computer Vision and Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Chess Engine Library
+python-chess>=1.999
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
