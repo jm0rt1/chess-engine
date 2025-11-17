@@ -74,6 +74,8 @@ class MainWindow(QMainWindow):
         self.current_image: Optional[np.ndarray] = None
         self.detected_board: Optional[tuple] = None
         self.recognition_results: Optional[list] = None
+        self.board_squares: Optional[list] = None  # Store square images for feedback
+        self.board_orientation: str = 'white'  # Track current board orientation
         
         # Set up the UI
         self._setup_ui()
@@ -175,6 +177,24 @@ class MainWindow(QMainWindow):
         analyze_action.setShortcut("Ctrl+E")
         analyze_action.triggered.connect(self.run_engine_analysis)
         analysis_menu.addAction(analyze_action)
+        
+        # Training menu
+        training_menu = menu_bar.addMenu("&Training")
+        
+        retrain_action = QAction("&Retrain from Feedback", self)
+        retrain_action.setShortcut("Ctrl+T")
+        retrain_action.triggered.connect(self.retrain_recognizer)
+        training_menu.addAction(retrain_action)
+        
+        training_menu.addSeparator()
+        
+        view_feedback_action = QAction("View &Feedback Statistics", self)
+        view_feedback_action.triggered.connect(self.show_feedback_stats)
+        training_menu.addAction(view_feedback_action)
+        
+        clear_feedback_action = QAction("&Clear Feedback Data", self)
+        clear_feedback_action.triggered.connect(self.clear_feedback)
+        training_menu.addAction(clear_feedback_action)
         
         # Help menu
         help_menu = menu_bar.addMenu("&Help")
@@ -291,6 +311,7 @@ class MainWindow(QMainWindow):
             
             board_image, squares = detection_result
             self.detected_board = (board_image, squares)
+            self.board_squares = squares  # Store for feedback
             
             # Step 4: Show board region
             self.status_bar.showMessage("Step 4/7: Extracting board...")
@@ -303,6 +324,13 @@ class MainWindow(QMainWindow):
             # Step 6: Recognize pieces
             self.status_bar.showMessage("Step 6/7: Recognizing pieces...")
             self.recognition_results = self.piece_recognizer.recognize_board(squares)
+            
+            # Detect board orientation
+            self.board_orientation = self.board_detector.detect_board_orientation(
+                squares, self.recognition_results
+            )
+            self.logger.info(f"Board orientation: {self.board_orientation}")
+            
             self.pipeline_widget.set_recognition_results(squares, self.recognition_results)
             
             # Step 7: Generate FEN and update board
@@ -470,12 +498,20 @@ class MainWindow(QMainWindow):
                 original_piece = result.piece_type
                 original_confidence = result.confidence
         
-        # Store feedback
+        # Get square image if available
+        square_image = None
+        if self.board_squares and row < len(self.board_squares):
+            if col < len(self.board_squares[row]):
+                square_image = self.board_squares[row][col]
+        
+        # Store feedback with image and orientation
         self.feedback_manager.add_feedback(
             square_name=square_name,
             original_prediction=original_piece,
             original_confidence=original_confidence,
-            user_correction=corrected_piece
+            user_correction=corrected_piece,
+            square_image=square_image,
+            board_orientation=self.board_orientation
         )
         
         # Update recognition results
@@ -514,6 +550,123 @@ class MainWindow(QMainWindow):
                 "Failed to update board position after correction."
             )
     
+    def retrain_recognizer(self):
+        """Retrain the piece recognizer using collected feedback."""
+        self.logger.info("Starting retraining from feedback")
+        
+        # Get training data from feedback
+        training_data = self.feedback_manager.get_training_data()
+        
+        if not training_data:
+            QMessageBox.warning(
+                self,
+                "No Training Data",
+                "No feedback data with images available for retraining.\n\n"
+                "Please make some piece corrections first to collect training data."
+            )
+            return
+        
+        # Confirm before retraining
+        reply = QMessageBox.question(
+            self,
+            "Confirm Retraining",
+            f"Retrain the piece recognizer using {len(training_data)} feedback samples?\n\n"
+            "This will adjust recognition parameters based on your corrections.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        # Perform retraining
+        self.status_bar.showMessage("Retraining recognizer...")
+        result = self.piece_recognizer.retrain_from_feedback(training_data)
+        
+        if result['status'] == 'success':
+            self.status_bar.showMessage("Retraining complete")
+            
+            # Show results
+            QMessageBox.information(
+                self,
+                "Retraining Complete",
+                f"Successfully retrained the piece recognizer!\n\n"
+                f"Training Statistics:\n"
+                f"• Samples processed: {result['samples_processed']}\n"
+                f"• Piece types trained: {result['piece_types_trained']}\n\n"
+                f"The recognizer will now use the improved parameters."
+            )
+        else:
+            QMessageBox.critical(
+                self,
+                "Retraining Failed",
+                f"Failed to retrain the recognizer.\n\n"
+                f"Reason: {result.get('reason', 'Unknown error')}"
+            )
+    
+    def show_feedback_stats(self):
+        """Show detailed feedback statistics."""
+        stats = self.feedback_manager.get_correction_statistics()
+        
+        if stats['total_corrections'] == 0:
+            QMessageBox.information(
+                self,
+                "Feedback Statistics",
+                "No feedback data collected yet.\n\n"
+                "Make piece corrections to start collecting training data."
+            )
+            return
+        
+        # Format piece type statistics
+        piece_stats = "\n".join([
+            f"  • {piece}: {count}"
+            for piece, count in sorted(stats['by_piece_type'].items())
+        ])
+        
+        # Get misclassification info
+        misclassified = self.feedback_manager.get_misclassified_feedback()
+        
+        QMessageBox.information(
+            self,
+            "Feedback Statistics",
+            f"<h3>Feedback Collection Statistics</h3>"
+            f"<p><b>Total corrections:</b> {stats['total_corrections']}</p>"
+            f"<p><b>Average original confidence:</b> {stats['avg_original_confidence']:.1%}</p>"
+            f"<p><b>Misclassifications:</b> {len(misclassified)} "
+            f"({len(misclassified)/stats['total_corrections']*100:.1f}%)</p>"
+            f"<p><b>Corrections by piece type:</b><br><pre>{piece_stats}</pre></p>"
+        )
+    
+    def clear_feedback(self):
+        """Clear all collected feedback data."""
+        stats = self.feedback_manager.get_correction_statistics()
+        
+        if stats['total_corrections'] == 0:
+            QMessageBox.information(
+                self,
+                "No Data",
+                "No feedback data to clear."
+            )
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            "Confirm Clear",
+            f"Clear all {stats['total_corrections']} feedback entries?\n\n"
+            "This will permanently delete all collected training data.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.feedback_manager.clear_feedback()
+            self.status_bar.showMessage("Feedback data cleared")
+            QMessageBox.information(
+                self,
+                "Data Cleared",
+                "All feedback data has been cleared."
+            )
+    
     def show_about(self):
         """Show the about dialog."""
         QMessageBox.about(
@@ -527,8 +680,9 @@ class MainWindow(QMainWindow):
             "<p><b>Features:</b></p>"
             "<ul>"
             "<li>Image processing pipeline visualization</li>"
-            "<li>Automatic piece recognition</li>"
+            "<li>Automatic piece recognition with board orientation detection</li>"
             "<li>Interactive piece correction with feedback collection</li>"
+            "<li>Model retraining from user corrections</li>"
             "<li>Board reconstruction and verification</li>"
             "<li>Threat analysis and move suggestions</li>"
             "</ul>"
