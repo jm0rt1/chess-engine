@@ -2,3 +2,14 @@ venv
 *.pyc
 */__pycache__/
 output/logs/
+__pycache__/
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+*.log
+.DS_Store
+*.swp
+*.swo
+*~

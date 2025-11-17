@@ -3,9 +3,8 @@ import unittest
 
 
 class TestDummy(unittest.TestCase):
-
-    def test_fails(self):
-        self.assertTrue(False)
+    """Dummy test class - can be removed once real tests are in place."""
 
     def test_passes(self):
+        """Simple passing test."""
         self.assertTrue(True)
