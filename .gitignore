@@ -2,6 +2,9 @@ venv
 *.pyc
 */__pycache__/
 output/logs/
+output/*.json
+output/*.png
+output/*.jpg
 __pycache__/
 *.pyo
 *.egg-info/

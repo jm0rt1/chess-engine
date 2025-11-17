@@ -1,0 +1,101 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║ Chess Engine - Image Processing & Analysis                                    ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║ File | Process | Analysis | Help                                              ║
+╠═══════════════════════════╦════════════════════════════════════════════════════╣
+║ Control Panel             ║ Board Reconstruction & Verification               ║
+║                           ║                                                    ║
+║ [Load Image...]           ║ [Enable Piece Correction]  ← Toggle Button        ║
+║                           ║                                                    ║
+║ [Process Image]           ║ Click on any square to correct the piece           ║
+║                           ║                                                    ║
+║ [Step Through Pipeline]   ║  8  ╔═══╦═══╦═══╦═══╦═══╦═══╦═══╦═══╗            ║
+║                           ║     ║ r ║ n ║ b ║ q ║ k ║ b ║ n ║ r ║            ║
+║ [Run Engine Analysis]     ║  7  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣            ║
+║                           ║     ║ p ║ p ║ p ║ p ║ p ║ p ║ p ║ p ║            ║
+║ [Reset]                   ║  6  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣            ║
+║                           ║     ║   ║   ║   ║   ║   ║   ║   ║   ║            ║
+║                           ║  5  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣            ║
+║ Manual FEN Entry:         ║     ║   ║   ║   ║   ║   ║   ║   ║   ║            ║
+║ [________________]         ║  4  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣            ║
+║                           ║     ║   ║   ║   ║   ║   ║   ║   ║   ║   ← Hover  ║
+║                           ║  3  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣      effect ║
+║                           ║     ║   ║   ║   ║   ║   ║   ║   ║   ║   (yellow) ║
+║                           ║  2  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣            ║
+║                           ║     ║ P ║ P ║ P ║ P ║ P ║ P ║ P ║ P ║            ║
+║                           ║  1  ╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣            ║
+║                           ║     ║ R ║ N ║ B ║ Q ║ K ║ B ║ N ║ R ║            ║
+║                           ║     ╚═══╩═══╩═══╩═══╩═══╩═══╩═══╩═══╝            ║
+║                           ║       a   b   c   d   e   f   g   h              ║
+║                           ║                                                    ║
+║                           ║ FEN Notation:                                      ║
+║                           ║ rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w ... ║
+║                           ║                                                    ║
+║                           ║ Board State:           Recognition Confidence:     ║
+║                           ║ Turn: White            Average: 87%                ║
+║                           ║ Status: Normal         Range: 65% - 100%           ║
+╠═══════════════════════════╩════════════════════════════════════════════════════╣
+║ Status: Piece corrected on E4 - Total corrections: 3                          ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+
+WHEN USER CLICKS ON A SQUARE (e.g., E4):
+╔═══════════════════════════════════════════════════════════════╗
+║ Correct Piece on E4                                           ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║ Current Recognition: White Pawn                               ║
+║ Confidence: 65%                                               ║
+║                                                               ║
+║ Please select the correct piece:                              ║
+║                                                               ║
+║ ┌─────────────────────────────────────┐                      ║
+║ │ White Pieces                        │                      ║
+║ ├─────────────────────────────────────┤                      ║
+║ │  [♔]    [♕]    [♖]                 │                      ║
+║ │  King   Queen  Rook                 │                      ║
+║ │                                     │                      ║
+║ │  [♗]    [♘]    [♙]                 │                      ║
+║ │  Bishop Knight Pawn                 │                      ║
+║ └─────────────────────────────────────┘                      ║
+║                                                               ║
+║ ┌─────────────────────────────────────┐                      ║
+║ │ Black Pieces                        │                      ║
+║ ├─────────────────────────────────────┤                      ║
+║ │  [♚]    [♛]    [♜]                 │                      ║
+║ │  King   Queen  Rook                 │                      ║
+║ │                                     │                      ║
+║ │  [♝]    [♞]    [♟]                 │                      ║
+║ │  Bishop Knight Pawn                 │                      ║
+║ └─────────────────────────────────────┘                      ║
+║                                                               ║
+║ [          Empty Square          ]  ← Button                 ║
+║                                                               ║
+║     [Confirm Selection]  [Cancel]                            ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+AFTER CORRECTION:
+╔═══════════════════════════════════════════════════════════════╗
+║ Piece Corrected                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║ Successfully corrected piece on E4!                           ║
+║                                                               ║
+║ The board position has been updated.                          ║
+║ Total corrections in this session: 3                          ║
+║                                                               ║
+║                    [OK]                                       ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+FEEDBACK DATA STORED IN: output/piece_recognition_feedback.json
+{
+  "square_name": "e4",
+  "original_prediction": "WHITE_PAWN",
+  "original_confidence": 0.65,
+  "user_correction": "WHITE_KNIGHT",
+  "timestamp": "2024-01-15T10:30:45.123456"
+}
