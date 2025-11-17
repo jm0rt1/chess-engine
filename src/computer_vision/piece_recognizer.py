@@ -95,6 +95,9 @@ class RecognitionResult:
         if self.piece_type == PieceType.EMPTY:
             return f"Empty square (confidence: {self.confidence:.2f})"
         
+        if self.piece_type is None:
+            return f"Unknown piece (confidence: {self.confidence:.2f})"
+        
         piece_name = self.piece_type.name.replace('_', ' ').title()
         return f"{piece_name} (confidence: {self.confidence:.2f})"
 
