@@ -311,7 +311,12 @@ class BoardReconstructionWidget(QWidget):
                     square_name = chess.square_name(
                         chess.square(col_idx, 7 - row_idx)
                     )
-                    piece_name = result.piece_type.name if result.piece_type else "Empty"
+                    if result.piece_type is None:
+                        piece_name = "Unknown"
+                    elif result.piece_type.name == "EMPTY":
+                        piece_name = "Empty"
+                    else:
+                        piece_name = result.piece_type.name
                     low_confidence_squares.append(
                         (square_name, piece_name, confidence)
                     )
