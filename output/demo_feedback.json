@@ -1,0 +1,30 @@
+[
+  {
+    "square_name": "e4",
+    "original_prediction": "WHITE_PAWN",
+    "original_confidence": 0.65,
+    "user_correction": "WHITE_KNIGHT",
+    "timestamp": "2025-11-17T13:50:52.530616"
+  },
+  {
+    "square_name": "e5",
+    "original_prediction": "BLACK_PAWN",
+    "original_confidence": 0.72,
+    "user_correction": "BLACK_BISHOP",
+    "timestamp": "2025-11-17T13:50:52.530880"
+  },
+  {
+    "square_name": "d4",
+    "original_prediction": "EMPTY",
+    "original_confidence": 0.55,
+    "user_correction": "WHITE_QUEEN",
+    "timestamp": "2025-11-17T13:50:52.531147"
+  },
+  {
+    "square_name": "a8",
+    "original_prediction": "BLACK_ROOK",
+    "original_confidence": 0.45,
+    "user_correction": "BLACK_ROOK",
+    "timestamp": "2025-11-17T13:50:52.531474"
+  }
+]

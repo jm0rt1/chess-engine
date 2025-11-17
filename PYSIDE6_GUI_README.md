@@ -30,6 +30,11 @@ The GUI displays every stage of the image processing workflow:
   - Green: High confidence (>80%)
   - Orange: Medium confidence (50-80%)
   - Red: Low confidence (<50%)
+- **Interactive Piece Correction**: Click on any square to correct recognized pieces
+  - Toggle correction mode with "Enable Piece Correction" button
+  - Visual hover effects show clickable squares
+  - Piece selection dialog for easy correction
+  - Automatic feedback collection for model improvement
 - **FEN Notation Display**: Complete FEN string for the position
 - **Board State Information**: Turn, check status, game status
 - **Recognition Summary**: Overall confidence statistics and warnings
@@ -141,7 +146,14 @@ python3 run_pyside6.py
    - Review confidence scores for each piece
    - Verify FEN notation is correct
 
-4. **Run Analysis**
+4. **Correct Pieces (Optional)**
+   - Click "Enable Piece Correction" button in Board Reconstruction tab
+   - Click on any square that was incorrectly recognized
+   - Select the correct piece from the dialog
+   - Board updates automatically with your correction
+   - Feedback is saved for future model training
+
+5. **Run Analysis**
    - Click "Run Engine Analysis"
    - Switch to "Engine Analysis" tab
    - View threat map (shows attacked squares)
@@ -163,6 +175,40 @@ If automatic recognition fails:
 2. Click anywhere to confirm
 3. Board updates immediately
 4. Proceed with analysis
+
+### Interactive Piece Correction
+
+The piece correction feature allows you to improve recognition accuracy:
+
+1. **Enable Correction Mode**
+   - In the "Board Reconstruction" tab, click "Enable Piece Correction"
+   - Instruction message appears: "Click on any square to correct the piece"
+   - All squares become interactive with hover effects
+
+2. **Correct a Piece**
+   - Click on a square that was incorrectly recognized
+   - A dialog appears showing:
+     - The square name (e.g., "E4")
+     - Current recognition result
+     - Confidence score
+   - Select the correct piece from:
+     - White pieces (King, Queen, Rook, Bishop, Knight, Pawn)
+     - Black pieces (King, Queen, Rook, Bishop, Knight, Pawn)
+     - Empty Square
+   - Click "Confirm Selection" or "Cancel"
+
+3. **After Correction**
+   - Board position updates immediately
+   - FEN notation is regenerated
+   - Confidence score changes to 100% for corrected square
+   - Correction count is displayed in status bar
+   - Feedback is automatically saved to `output/piece_recognition_feedback.json`
+
+4. **Using Feedback**
+   - All corrections are saved persistently
+   - Feedback includes: square name, original prediction, confidence, and user correction
+   - This data can be used to retrain or fine-tune the recognition model
+   - Feedback is preserved across application sessions
 
 ## Architecture
 
@@ -355,6 +401,43 @@ export QT_QPA_PLATFORM=offscreen
 | Professional Look | Basic | **Modern** |
 | Customization | Limited | **Extensive** |
 
+## Feedback & Model Training
+
+The application collects user feedback on piece recognition to enable future model improvements:
+
+### Feedback Storage
+- **Location**: `output/piece_recognition_feedback.json`
+- **Format**: JSON array of feedback entries
+- **Data Collected**:
+  - Square name (e.g., 'e4')
+  - Original prediction and confidence
+  - User's correction
+  - Timestamp
+
+### Using Feedback for Training
+The collected feedback can be used to:
+1. **Identify weak spots**: Find which pieces are frequently misrecognized
+2. **Build training dataset**: Use corrections as ground truth labels
+3. **Fine-tune model**: Retrain recognition algorithms with real-world corrections
+4. **Improve accuracy**: Target specific piece types that need improvement
+
+### Viewing Feedback Statistics
+After making corrections, the application displays:
+- Total number of corrections in the session
+- Count by piece type
+- Average confidence of corrected predictions
+
+### Exporting Feedback
+Developers can programmatically export feedback:
+```python
+from src.computer_vision.feedback_manager import FeedbackManager
+
+manager = FeedbackManager()
+stats = manager.get_correction_statistics()
+print(f"Total corrections: {stats['total_corrections']}")
+manager.export_feedback(Path('my_feedback.json'))
+```
+
 ## Future Enhancements
 
 ### Potential Additions
@@ -366,6 +449,8 @@ export QT_QPA_PLATFORM=offscreen
 6. **Multiple Engine Support**: Connect to Stockfish, etc.
 7. **Opening Book**: Display opening names
 8. **Export Capabilities**: Save analysis as images/PDF
+9. **Machine Learning Integration**: Use collected feedback to train a neural network for piece recognition
+10. **Batch Correction**: Correct multiple pieces at once
 
 ## Technical Details
 

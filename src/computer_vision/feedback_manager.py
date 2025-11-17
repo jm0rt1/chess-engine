@@ -135,6 +135,11 @@ class FeedbackManager:
             self.logger.info("No existing feedback file found")
             return
         
+        # Check if file is empty
+        if self.feedback_file.stat().st_size == 0:
+            self.logger.info("Feedback file is empty")
+            return
+        
         try:
             with open(self.feedback_file, 'r') as f:
                 data = json.load(f)
