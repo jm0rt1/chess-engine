@@ -20,10 +20,28 @@ sudo apt-get install python3-tk
 
 ## Run the Application
 
+### Option 1: PySide6 GUI (Recommended - Enhanced Visualization)
+
 ```bash
-# Launch GUI
+# Launch PySide6 GUI with comprehensive visualization
+python run_pyside6.py
+```
+
+### Option 2: Original Tkinter GUI
+
+```bash
+# Launch original Tkinter GUI
 python run.py
 ```
+
+**Note**: The PySide6 GUI provides superior visualization including:
+- Step-by-step image processing pipeline
+- Visual board reconstruction with confidence scores
+- Color-coded threat maps
+- Move suggestions with arrows
+- Professional appearance
+
+See `PYSIDE6_GUI_README.md` for detailed PySide6 documentation.
 
 ## Using the GUI (Step-by-Step)
 
