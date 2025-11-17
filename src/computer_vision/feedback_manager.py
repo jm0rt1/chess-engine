@@ -10,6 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
 import numpy as np
+import cv2
+import base64
 
 from src.computer_vision.piece_recognizer import PieceType
 
@@ -24,6 +26,8 @@ class PieceFeedback:
         original_confidence (float): Original confidence score.
         user_correction (PieceType): User's correction.
         timestamp (str): ISO format timestamp of feedback.
+        square_image_path (Optional[str]): Path to saved square image for retraining.
+        board_orientation (Optional[str]): Board orientation ('white' or 'black' facing user).
     """
     
     def __init__(
@@ -32,7 +36,9 @@ class PieceFeedback:
         original_prediction: Optional[PieceType],
         original_confidence: float,
         user_correction: PieceType,
-        timestamp: Optional[str] = None
+        timestamp: Optional[str] = None,
+        square_image_path: Optional[str] = None,
+        board_orientation: Optional[str] = None
     ):
         """
         Initialize a PieceFeedback instance.
@@ -43,12 +49,16 @@ class PieceFeedback:
             original_confidence: Confidence of original prediction.
             user_correction: What the user said it should be.
             timestamp: Optional timestamp (defaults to now).
+            square_image_path: Optional path to square image file.
+            board_orientation: Optional board orientation ('white' or 'black').
         """
         self.square_name = square_name
         self.original_prediction = original_prediction
         self.original_confidence = original_confidence
         self.user_correction = user_correction
         self.timestamp = timestamp or datetime.now().isoformat()
+        self.square_image_path = square_image_path
+        self.board_orientation = board_orientation
     
     def to_dict(self) -> Dict:
         """
@@ -62,7 +72,9 @@ class PieceFeedback:
             'original_prediction': self.original_prediction.name if self.original_prediction else None,
             'original_confidence': self.original_confidence,
             'user_correction': self.user_correction.name if self.user_correction else None,
-            'timestamp': self.timestamp
+            'timestamp': self.timestamp,
+            'square_image_path': self.square_image_path,
+            'board_orientation': self.board_orientation
         }
     
     @staticmethod
@@ -89,7 +101,9 @@ class PieceFeedback:
             original_prediction=original_pred,
             original_confidence=data['original_confidence'],
             user_correction=user_corr,
-            timestamp=data.get('timestamp')
+            timestamp=data.get('timestamp'),
+            square_image_path=data.get('square_image_path'),
+            board_orientation=data.get('board_orientation')
         )
 
 
@@ -165,12 +179,44 @@ class FeedbackManager:
         except Exception as e:
             self.logger.error(f"Error saving feedback: {e}", exc_info=True)
     
+    def _save_square_image(self, square_image: np.ndarray, square_name: str) -> Optional[str]:
+        """
+        Save a square image for training data.
+        
+        Args:
+            square_image: Image of the square.
+            square_name: Chess square name for filename.
+            
+        Returns:
+            Optional[str]: Relative path to saved image, or None if failed.
+        """
+        try:
+            # Create training images directory
+            images_dir = self.feedback_file.parent / 'training_images'
+            images_dir.mkdir(exist_ok=True)
+            
+            # Generate unique filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            filename = f"{square_name}_{timestamp}.png"
+            image_path = images_dir / filename
+            
+            # Save image
+            cv2.imwrite(str(image_path), square_image)
+            
+            # Return relative path
+            return f"training_images/{filename}"
+        except Exception as e:
+            self.logger.error(f"Error saving square image: {e}", exc_info=True)
+            return None
+    
     def add_feedback(
         self,
         square_name: str,
         original_prediction: Optional[PieceType],
         original_confidence: float,
-        user_correction: PieceType
+        user_correction: PieceType,
+        square_image: Optional[np.ndarray] = None,
+        board_orientation: Optional[str] = None
     ):
         """
         Add a new piece of feedback.
@@ -180,12 +226,21 @@ class FeedbackManager:
             original_prediction: Original model prediction.
             original_confidence: Confidence of original prediction.
             user_correction: User's correction.
+            square_image: Optional image of the square for training.
+            board_orientation: Optional board orientation ('white' or 'black').
         """
+        # Save square image if provided
+        square_image_path = None
+        if square_image is not None:
+            square_image_path = self._save_square_image(square_image, square_name)
+        
         feedback = PieceFeedback(
             square_name=square_name,
             original_prediction=original_prediction,
             original_confidence=original_confidence,
-            user_correction=user_correction
+            user_correction=user_correction,
+            square_image_path=square_image_path,
+            board_orientation=board_orientation
         )
         
         self.feedback_data.append(feedback)
@@ -257,3 +312,52 @@ class FeedbackManager:
             self.logger.info(f"Exported feedback to {export_path}")
         except Exception as e:
             self.logger.error(f"Error exporting feedback: {e}", exc_info=True)
+    
+    def get_training_data(self) -> List[tuple]:
+        """
+        Get training data from feedback for model retraining.
+        
+        Returns:
+            List[tuple]: List of (image, label) tuples where image is np.ndarray
+                        and label is PieceType. Only includes feedback with images.
+        """
+        training_data = []
+        base_dir = self.feedback_file.parent
+        
+        for fb in self.feedback_data:
+            if fb.square_image_path:
+                image_path = base_dir / fb.square_image_path
+                if image_path.exists():
+                    try:
+                        image = cv2.imread(str(image_path))
+                        if image is not None:
+                            training_data.append((image, fb.user_correction))
+                    except Exception as e:
+                        self.logger.warning(f"Failed to load image {image_path}: {e}")
+        
+        self.logger.info(f"Retrieved {len(training_data)} training samples from feedback")
+        return training_data
+    
+    def get_feedback_by_piece_type(self, piece_type: PieceType) -> List[PieceFeedback]:
+        """
+        Get all feedback for a specific piece type.
+        
+        Args:
+            piece_type: The piece type to filter by.
+            
+        Returns:
+            List[PieceFeedback]: Feedback entries for the specified piece type.
+        """
+        return [fb for fb in self.feedback_data if fb.user_correction == piece_type]
+    
+    def get_misclassified_feedback(self) -> List[PieceFeedback]:
+        """
+        Get feedback where the original prediction was incorrect.
+        
+        Returns:
+            List[PieceFeedback]: Feedback entries where prediction != correction.
+        """
+        return [
+            fb for fb in self.feedback_data 
+            if fb.original_prediction != fb.user_correction
+        ]

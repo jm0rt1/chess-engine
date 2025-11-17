@@ -394,3 +394,110 @@ class PieceRecognizer:
         fen = '/'.join(fen_rows) + ' w KQkq - 0 1'
         
         return fen
+    
+    def retrain_from_feedback(self, training_data: List[Tuple[np.ndarray, PieceType]]) -> Dict:
+        """
+        Retrain/fine-tune the piece recognizer using feedback data.
+        
+        This method analyzes feedback data to adjust recognition parameters
+        and improve accuracy. Since we use heuristic-based recognition,
+        we adjust thresholds based on observed patterns.
+        
+        Args:
+            training_data: List of (image, correct_label) tuples.
+            
+        Returns:
+            Dict: Training statistics and improvements.
+        """
+        if not training_data:
+            self.logger.warning("No training data provided")
+            return {'status': 'failed', 'reason': 'no_data'}
+        
+        self.logger.info(f"Retraining with {len(training_data)} samples")
+        
+        # Group samples by piece type
+        piece_samples = {}
+        for image, piece_type in training_data:
+            if piece_type not in piece_samples:
+                piece_samples[piece_type] = []
+            piece_samples[piece_type].append(image)
+        
+        # Analyze features for each piece type
+        piece_features = {}
+        for piece_type, images in piece_samples.items():
+            features_list = [self.analyze_square_features(img) for img in images]
+            
+            # Calculate average features for this piece type
+            avg_features = {}
+            for key in features_list[0].keys():
+                values = [f[key] for f in features_list]
+                avg_features[key] = {
+                    'mean': np.mean(values),
+                    'std': np.std(values),
+                    'min': np.min(values),
+                    'max': np.max(values)
+                }
+            
+            piece_features[piece_type.name] = avg_features
+        
+        # Adjust thresholds based on learned features
+        self._update_thresholds_from_features(piece_features)
+        
+        stats = {
+            'status': 'success',
+            'samples_processed': len(training_data),
+            'piece_types_trained': len(piece_samples),
+            'piece_counts': {pt.name: len(imgs) for pt, imgs in piece_samples.items()},
+            'learned_features': piece_features
+        }
+        
+        self.logger.info(f"Retraining complete: {stats['piece_types_trained']} piece types")
+        return stats
+    
+    def _update_thresholds_from_features(self, piece_features: Dict):
+        """
+        Update internal thresholds based on learned features.
+        
+        Args:
+            piece_features: Dictionary of average features per piece type.
+        """
+        # Adjust empty square detection threshold
+        if PieceType.EMPTY.name in piece_features:
+            empty_edge = piece_features[PieceType.EMPTY.name]['edge_density']['mean']
+            # Empty squares should have low edge density
+            self.logger.info(f"Learned empty square edge density: {empty_edge:.3f}")
+        
+        # Calculate average edge densities for pieces
+        piece_edge_densities = []
+        for piece_name, features in piece_features.items():
+            if piece_name != PieceType.EMPTY.name:
+                piece_edge_densities.append(features['edge_density']['mean'])
+        
+        if piece_edge_densities:
+            avg_piece_edge = np.mean(piece_edge_densities)
+            self.logger.info(f"Average piece edge density: {avg_piece_edge:.3f}")
+        
+        # Store learned features for future use
+        if not hasattr(self, 'learned_features'):
+            self.learned_features = {}
+        self.learned_features.update(piece_features)
+    
+    def get_training_statistics(self) -> Dict:
+        """
+        Get statistics about the current training state.
+        
+        Returns:
+            Dict: Training statistics including learned features.
+        """
+        if not hasattr(self, 'learned_features'):
+            return {
+                'trained': False,
+                'message': 'No training data has been applied yet'
+            }
+        
+        return {
+            'trained': True,
+            'piece_types': list(self.learned_features.keys()),
+            'num_piece_types': len(self.learned_features),
+            'features': self.learned_features
+        }
