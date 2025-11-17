@@ -258,3 +258,138 @@ class BoardDetector:
         cv2.rectangle(result, (x, y), (x + w, y + h), (0, 255, 0), 3)
         
         return result
+    
+    def detect_board_orientation(
+        self,
+        squares: List[List[np.ndarray]],
+        recognition_results: Optional[List[List[any]]] = None
+    ) -> str:
+        """
+        Detect board orientation based on piece positions or square colors.
+        
+        This method attempts to determine if the board is viewed from white's
+        perspective (rank 1 at bottom) or black's perspective (rank 8 at bottom).
+        
+        Args:
+            squares: 8x8 grid of square images.
+            recognition_results: Optional recognition results to help determine orientation.
+            
+        Returns:
+            str: 'white' if white is at bottom, 'black' if black is at bottom.
+        """
+        # Strategy 1: Use corner square colors
+        # In standard chess boards: a1 and h8 are dark squares, a8 and h1 are light squares
+        # When white faces user: bottom-left (a1) is dark
+        # When black faces user: bottom-left (a8) is light
+        
+        bottom_left = squares[7][0]  # Row 7 (bottom), Col 0 (left)
+        top_right = squares[0][7]    # Row 0 (top), Col 7 (right)
+        
+        bl_brightness = self._calculate_square_brightness(bottom_left)
+        tr_brightness = self._calculate_square_brightness(top_right)
+        
+        # If bottom-left is darker than top-right, it's likely a1 (dark square)
+        # which means white is facing the user
+        if bl_brightness < tr_brightness - 10:  # threshold for color difference
+            self.logger.info("Board orientation detected: WHITE facing user (bottom)")
+            return 'white'
+        elif tr_brightness < bl_brightness - 10:
+            self.logger.info("Board orientation detected: BLACK facing user (bottom)")
+            return 'black'
+        
+        # Strategy 2: If we have recognition results, check for starting positions
+        if recognition_results:
+            orientation = self._detect_orientation_from_pieces(recognition_results)
+            if orientation:
+                return orientation
+        
+        # Default to white if uncertain
+        self.logger.warning("Could not confidently detect board orientation, defaulting to WHITE")
+        return 'white'
+    
+    def _calculate_square_brightness(self, square_image: np.ndarray) -> float:
+        """
+        Calculate average brightness of a square.
+        
+        Args:
+            square_image: Image of a chess square.
+            
+        Returns:
+            float: Average brightness (0-255).
+        """
+        gray = cv2.cvtColor(square_image, cv2.COLOR_BGR2GRAY)
+        return np.mean(gray)
+    
+    def _detect_orientation_from_pieces(self, recognition_results: List[List[any]]) -> Optional[str]:
+        """
+        Detect orientation based on piece positions.
+        
+        Looks for typical starting position indicators like:
+        - Rooks in corners
+        - Pawns in second/seventh ranks
+        
+        Args:
+            recognition_results: Recognition results grid.
+            
+        Returns:
+            Optional[str]: 'white' or 'black' if detected, None if uncertain.
+        """
+        try:
+            # Check bottom row (row 7) for white pieces
+            bottom_row_white = 0
+            bottom_row_black = 0
+            
+            for col in range(8):
+                if hasattr(recognition_results[7][col], 'piece_type'):
+                    piece = recognition_results[7][col].piece_type
+                    if piece:
+                        piece_name = piece.name if hasattr(piece, 'name') else str(piece)
+                        if 'WHITE' in piece_name:
+                            bottom_row_white += 1
+                        elif 'BLACK' in piece_name:
+                            bottom_row_black += 1
+            
+            # Check top row (row 0) for white pieces
+            top_row_white = 0
+            top_row_black = 0
+            
+            for col in range(8):
+                if hasattr(recognition_results[0][col], 'piece_type'):
+                    piece = recognition_results[0][col].piece_type
+                    if piece:
+                        piece_name = piece.name if hasattr(piece, 'name') else str(piece)
+                        if 'WHITE' in piece_name:
+                            top_row_white += 1
+                        elif 'BLACK' in piece_name:
+                            top_row_black += 1
+            
+            # If bottom row has more white pieces, white is at bottom
+            if bottom_row_white > bottom_row_black and bottom_row_white >= 2:
+                self.logger.info("Orientation detected from pieces: WHITE at bottom")
+                return 'white'
+            # If top row has more white pieces, black is at bottom
+            elif top_row_white > top_row_black and top_row_white >= 2:
+                self.logger.info("Orientation detected from pieces: BLACK at bottom")
+                return 'black'
+        except Exception as e:
+            self.logger.warning(f"Error detecting orientation from pieces: {e}")
+        
+        return None
+    
+    def flip_board(self, squares: List[List[np.ndarray]]) -> List[List[np.ndarray]]:
+        """
+        Flip board orientation (rotate 180 degrees).
+        
+        Args:
+            squares: 8x8 grid of square images.
+            
+        Returns:
+            List[List[np.ndarray]]: Flipped 8x8 grid.
+        """
+        flipped = []
+        for row in reversed(squares):
+            flipped_row = list(reversed(row))
+            flipped.append(flipped_row)
+        
+        self.logger.info("Board orientation flipped")
+        return flipped

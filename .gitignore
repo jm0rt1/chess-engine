@@ -5,6 +5,7 @@ output/logs/
 output/*.json
 output/*.png
 output/*.jpg
+output/training_images/
 __pycache__/
 *.pyo
 *.egg-info/

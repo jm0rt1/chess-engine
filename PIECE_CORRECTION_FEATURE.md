@@ -115,8 +115,11 @@ MainWindow.on_piece_corrected()
 ### File Locations
 
 - **Feedback Storage**: `output/piece_recognition_feedback.json`
+- **Training Images**: `output/training_images/*.png`
 - **Dialog Component**: `src/gui_pyside6/widgets/piece_correction_dialog.py`
 - **Feedback Manager**: `src/computer_vision/feedback_manager.py`
+- **Piece Recognizer**: `src/computer_vision/piece_recognizer.py` (with retraining)
+- **Board Detector**: `src/computer_vision/board_detector.py` (with orientation)
 - **Board Widget**: `src/gui_pyside6/widgets/board_widget.py` (enhanced)
 - **Main Window**: `src/gui_pyside6/main_window.py` (enhanced)
 
@@ -259,16 +262,133 @@ Tests cover:
 - **Verify**: Recognition results array is properly updated
 - **Try**: Restart application and reload image
 
+## Model Retraining
+
+### Overview
+
+The system now supports retraining the piece recognizer based on collected feedback. This allows the recognition accuracy to improve over time as users make corrections.
+
+### How It Works
+
+1. **Feedback Collection**: When users correct pieces, the system:
+   - Saves the square image to `output/training_images/`
+   - Records the original prediction and user correction
+   - Stores the board orientation (white/black at bottom)
+
+2. **Retraining Process**: 
+   - Analyzes features from corrected square images
+   - Adjusts recognition thresholds based on patterns
+   - Updates internal parameters to improve accuracy
+
+3. **Training Data Management**:
+   - Images stored as PNG files with timestamps
+   - JSON metadata tracks corrections and confidence
+   - Can be exported for external ML model training
+
+### Using the Retraining Feature
+
+#### From the GUI
+
+1. Make several piece corrections (minimum 3-5 recommended)
+2. Go to `Training` → `Retrain from Feedback`
+3. Confirm the retraining operation
+4. Review the training statistics
+
+#### From Code
+
+```python
+from src.computer_vision.feedback_manager import FeedbackManager
+from src.computer_vision.piece_recognizer import PieceRecognizer
+
+# Get training data
+manager = FeedbackManager()
+training_data = manager.get_training_data()
+
+# Retrain recognizer
+recognizer = PieceRecognizer()
+result = recognizer.retrain_from_feedback(training_data)
+
+if result['status'] == 'success':
+    print(f"Trained with {result['samples_processed']} samples")
+    print(f"Piece types: {result['piece_types_trained']}")
+```
+
+### Viewing Statistics
+
+Access feedback statistics through:
+- **GUI**: `Training` → `View Feedback Statistics`
+- **Code**: `manager.get_correction_statistics()`
+
+Statistics include:
+- Total corrections made
+- Average original confidence
+- Misclassification rate
+- Corrections by piece type
+
+### Clearing Feedback
+
+To start fresh or remove old training data:
+- **GUI**: `Training` → `Clear Feedback Data`
+- **Code**: `manager.clear_feedback()`
+
+**Warning**: This permanently deletes all feedback and training images.
+
+## Board Orientation Detection
+
+### Overview
+
+The system automatically detects whether the board is viewed from white's perspective (rank 1 at bottom) or black's perspective (rank 8 at bottom).
+
+### Detection Methods
+
+1. **Square Color Analysis**:
+   - Analyzes corner square brightness
+   - In standard boards: a1 and h8 are dark, a8 and h1 are light
+   - Determines orientation based on bottom-left square color
+
+2. **Piece Position Analysis**:
+   - Looks for white/black pieces in bottom and top rows
+   - Uses starting position heuristics
+   - More reliable when pieces are in initial positions
+
+### Using Orientation Detection
+
+The orientation is automatically detected during image processing:
+
+```python
+from src.computer_vision.board_detector import BoardDetector
+
+detector = BoardDetector()
+board_image, squares = detector.detect_board(image)
+
+# Detect orientation
+orientation = detector.detect_board_orientation(squares, recognition_results)
+print(f"Board orientation: {orientation}")  # 'white' or 'black'
+
+# Flip if needed
+if orientation == 'black':
+    squares = detector.flip_board(squares)
+```
+
+### Orientation in Feedback
+
+Board orientation is automatically recorded with each correction, enabling:
+- Context-aware retraining
+- Analysis of orientation-specific errors
+- Better understanding of recognition challenges
+
 ## Future Improvements
 
 1. **Bulk Correction Mode**: Select and correct multiple squares at once
 2. **Confidence Threshold Filtering**: Only show squares below certain confidence
 3. **Undo/Redo**: Revert corrections if needed
 4. **Correction History**: View all corrections made in a session
-5. **ML Model Integration**: Use feedback to automatically retrain models
+5. **Advanced ML Models**: Train neural networks using feedback data
 6. **Collaborative Feedback**: Share feedback across users for better training
 7. **Smart Suggestions**: Suggest likely corrections based on board context
 8. **Keyboard Shortcuts**: Quick piece selection with keys
+9. **Orientation Visualization**: Show detected orientation in GUI
+10. **Auto-correct Low Confidence**: Automatically suggest corrections
 
 ## Performance Considerations
 
