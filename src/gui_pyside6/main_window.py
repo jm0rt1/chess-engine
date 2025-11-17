@@ -22,7 +22,8 @@ from src.chess_engine.board_manager import BoardManager
 from src.chess_engine.threat_analyzer import ThreatAnalyzer
 from src.chess_engine.move_suggester import MoveSuggester
 from src.computer_vision.board_detector import BoardDetector
-from src.computer_vision.piece_recognizer import PieceRecognizer
+from src.computer_vision.piece_recognizer import PieceRecognizer, PieceType, RecognitionResult
+from src.computer_vision.feedback_manager import FeedbackManager
 
 from .widgets.pipeline_widget import PipelineVisualizationWidget
 from .widgets.board_widget import BoardReconstructionWidget
@@ -65,6 +66,9 @@ class MainWindow(QMainWindow):
         # Initialize computer vision components
         self.board_detector = BoardDetector()
         self.piece_recognizer = PieceRecognizer()
+        
+        # Initialize feedback manager
+        self.feedback_manager = FeedbackManager()
         
         # State variables
         self.current_image: Optional[np.ndarray] = None
@@ -190,6 +194,9 @@ class MainWindow(QMainWindow):
         
         # Pipeline widget signals
         self.pipeline_widget.stage_selected.connect(self.on_pipeline_stage_selected)
+        
+        # Board widget signals
+        self.board_widget.piece_corrected.connect(self.on_piece_corrected)
     
     def load_image(self):
         """
@@ -441,6 +448,72 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Application reset - Load an image to begin")
             self.logger.info("Application reset")
     
+    def on_piece_corrected(self, square_name: str, row: int, col: int, corrected_piece: PieceType):
+        """
+        Handle piece correction from user.
+        
+        Args:
+            square_name: Chess square name (e.g., 'e4').
+            row: Board row (0-7).
+            col: Board column (0-7).
+            corrected_piece: The corrected piece type.
+        """
+        self.logger.info(f"User corrected piece on {square_name} to {corrected_piece}")
+        
+        # Get original prediction
+        original_piece = None
+        original_confidence = 0.0
+        
+        if self.recognition_results and row < len(self.recognition_results):
+            if col < len(self.recognition_results[row]):
+                result = self.recognition_results[row][col]
+                original_piece = result.piece_type
+                original_confidence = result.confidence
+        
+        # Store feedback
+        self.feedback_manager.add_feedback(
+            square_name=square_name,
+            original_prediction=original_piece,
+            original_confidence=original_confidence,
+            user_correction=corrected_piece
+        )
+        
+        # Update recognition results
+        if self.recognition_results:
+            self.recognition_results[row][col] = RecognitionResult(
+                piece_type=corrected_piece,
+                confidence=1.0  # User correction is 100% confident
+            )
+        
+        # Regenerate FEN and update board
+        fen = self.piece_recognizer.results_to_fen(self.recognition_results)
+        
+        if self.board_manager.set_position_from_fen(fen):
+            # Update board widget
+            self.board_widget.set_board_state(self.board_manager)
+            self.board_widget.set_recognition_results(self.recognition_results)
+            
+            # Show feedback stats
+            stats = self.feedback_manager.get_correction_statistics()
+            self.status_bar.showMessage(
+                f"Piece corrected on {square_name.upper()} - "
+                f"Total corrections: {stats['total_corrections']}"
+            )
+            
+            QMessageBox.information(
+                self,
+                "Piece Corrected",
+                f"Successfully corrected piece on {square_name.upper()}!\n\n"
+                f"The board position has been updated.\n"
+                f"Total corrections in this session: {stats['total_corrections']}"
+            )
+        else:
+            QMessageBox.critical(
+                self,
+                "Error",
+                "Failed to update board position after correction."
+            )
+    
     def show_about(self):
         """Show the about dialog."""
         QMessageBox.about(
@@ -455,6 +528,7 @@ class MainWindow(QMainWindow):
             "<ul>"
             "<li>Image processing pipeline visualization</li>"
             "<li>Automatic piece recognition</li>"
+            "<li>Interactive piece correction with feedback collection</li>"
             "<li>Board reconstruction and verification</li>"
             "<li>Threat analysis and move suggestions</li>"
             "</ul>"

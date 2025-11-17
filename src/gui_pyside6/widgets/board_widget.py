@@ -8,13 +8,62 @@ with detected pieces overlaid.
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTextEdit, QGraphicsView, QGraphicsScene, QGraphicsRectItem,
-    QGraphicsTextItem
+    QGraphicsTextItem, QPushButton
 )
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, Signal
 from PySide6.QtGui import QColor, QBrush, QPen, QFont, QPixmap, QImage
 import chess
 from typing import Optional, List
 import numpy as np
+
+
+class ClickableSquare(QGraphicsRectItem):
+    """A clickable chess board square."""
+    
+    def __init__(self, row: int, col: int, square_size: float, widget):
+        """
+        Initialize a clickable square.
+        
+        Args:
+            row: Board row (0-7).
+            col: Board column (0-7).
+            square_size: Size of the square in pixels.
+            widget: Parent BoardReconstructionWidget instance.
+        """
+        super().__init__(
+            col * square_size,
+            row * square_size,
+            square_size,
+            square_size
+        )
+        self.row = row
+        self.col = col
+        self.widget = widget
+        self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.hover_color = QColor(255, 255, 0, 100)  # Yellow highlight
+        self.original_brush = None
+    
+    def hoverEnterEvent(self, event):
+        """Handle mouse hover enter."""
+        self.original_brush = self.brush()
+        # Add yellow tint
+        highlight_brush = QBrush(self.hover_color)
+        self.setBrush(highlight_brush)
+        super().hoverEnterEvent(event)
+    
+    def hoverLeaveEvent(self, event):
+        """Handle mouse hover leave."""
+        if self.original_brush:
+            self.setBrush(self.original_brush)
+        super().hoverLeaveEvent(event)
+    
+    def mousePressEvent(self, event):
+        """Handle mouse click."""
+        if event.button() == Qt.LeftButton:
+            square_name = chess.square_name(chess.square(self.col, 7 - self.row))
+            self.widget.on_square_clicked(square_name, self.row, self.col)
+        super().mousePressEvent(event)
 
 
 class BoardReconstructionWidget(QWidget):
@@ -26,11 +75,18 @@ class BoardReconstructionWidget(QWidget):
     - FEN notation
     - Board state information
     - Recognition confidence for each piece
+    - Interactive piece correction (click on squares)
     
     Attributes:
         board_manager: Chess board manager instance.
         recognition_results: Results from piece recognition.
+        
+    Signals:
+        piece_corrected: Emitted when user corrects a piece.
+                        Args: (square_name, row, col, new_piece_type)
     """
+    
+    piece_corrected = Signal(str, int, int, object)  # square_name, row, col, PieceType
     
     def __init__(self, parent=None):
         """
@@ -43,6 +99,7 @@ class BoardReconstructionWidget(QWidget):
         
         self.board_manager = None
         self.recognition_results = None
+        self.correction_mode_enabled = False
         
         self._setup_ui()
     
@@ -50,14 +107,34 @@ class BoardReconstructionWidget(QWidget):
         """Set up the user interface."""
         layout = QVBoxLayout(self)
         
-        # Title
+        # Title and correction mode toggle
+        title_layout = QHBoxLayout()
+        
         title = QLabel("Board Reconstruction & Verification")
         title_font = QFont()
         title_font.setPointSize(12)
         title_font.setBold(True)
         title.setFont(title_font)
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        title.setAlignment(Qt.AlignLeft)
+        title_layout.addWidget(title)
+        
+        title_layout.addStretch()
+        
+        # Correction mode toggle button
+        self.correction_mode_btn = QPushButton("Enable Piece Correction")
+        self.correction_mode_btn.setCheckable(True)
+        self.correction_mode_btn.setToolTip("Click to enable/disable piece correction mode")
+        self.correction_mode_btn.clicked.connect(self._toggle_correction_mode)
+        title_layout.addWidget(self.correction_mode_btn)
+        
+        layout.addLayout(title_layout)
+        
+        # Instructions label
+        self.instructions_label = QLabel("")
+        self.instructions_label.setAlignment(Qt.AlignCenter)
+        self.instructions_label.setStyleSheet("color: blue; font-weight: bold;")
+        self.instructions_label.setVisible(False)
+        layout.addWidget(self.instructions_label)
         
         # Main content area
         content_layout = QHBoxLayout()
@@ -110,6 +187,54 @@ class BoardReconstructionWidget(QWidget):
         
         layout.addLayout(content_layout)
     
+    def _toggle_correction_mode(self, checked: bool):
+        """Toggle correction mode on/off."""
+        self.correction_mode_enabled = checked
+        
+        if checked:
+            self.correction_mode_btn.setText("Disable Piece Correction")
+            self.instructions_label.setText("Click on any square to correct the piece")
+            self.instructions_label.setVisible(True)
+        else:
+            self.correction_mode_btn.setText("Enable Piece Correction")
+            self.instructions_label.setVisible(False)
+        
+        # Redraw board to update clickable state
+        self._draw_board()
+    
+    def on_square_clicked(self, square_name: str, row: int, col: int):
+        """
+        Handle square click event.
+        
+        Args:
+            square_name: Chess square name (e.g., 'e4').
+            row: Board row (0-7).
+            col: Board column (0-7).
+        """
+        if not self.correction_mode_enabled:
+            return
+        
+        # Get current piece for this square
+        current_piece = None
+        confidence = 0.0
+        
+        if self.recognition_results and row < len(self.recognition_results):
+            if col < len(self.recognition_results[row]):
+                result = self.recognition_results[row][col]
+                current_piece = result.piece_type
+                confidence = result.confidence
+        
+        # Import here to avoid circular imports
+        from .piece_correction_dialog import PieceCorrectionDialog
+        
+        # Show correction dialog
+        dialog = PieceCorrectionDialog(square_name, current_piece, confidence, self)
+        if dialog.exec():
+            corrected_piece = dialog.get_selected_piece()
+            if corrected_piece is not None:
+                # Emit signal with correction
+                self.piece_corrected.emit(square_name, row, col, corrected_piece)
+    
     def _draw_board(self):
         """Draw the chess board with pieces."""
         self.board_scene.clear()
@@ -128,16 +253,22 @@ class BoardReconstructionWidget(QWidget):
                 is_light = (row + col) % 2 == 0
                 color = QColor(240, 217, 181) if is_light else QColor(181, 136, 99)
                 
-                # Draw square
-                rect = QGraphicsRectItem(
-                    col * square_size,
-                    row * square_size,
-                    square_size,
-                    square_size
-                )
-                rect.setBrush(QBrush(color))
-                rect.setPen(QPen(Qt.NoPen))
-                self.board_scene.addItem(rect)
+                # Draw square (clickable if correction mode is enabled)
+                if self.correction_mode_enabled:
+                    rect = ClickableSquare(row, col, square_size, self)
+                    rect.setBrush(QBrush(color))
+                    rect.setPen(QPen(Qt.NoPen))
+                    self.board_scene.addItem(rect)
+                else:
+                    rect = QGraphicsRectItem(
+                        col * square_size,
+                        row * square_size,
+                        square_size,
+                        square_size
+                    )
+                    rect.setBrush(QBrush(color))
+                    rect.setPen(QPen(Qt.NoPen))
+                    self.board_scene.addItem(rect)
                 
                 # Draw coordinate labels
                 if col == 0:
