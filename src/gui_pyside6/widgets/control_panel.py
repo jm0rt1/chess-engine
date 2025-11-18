@@ -36,6 +36,7 @@ class ControlPanelWidget(QWidget):
     process_image_signal = Signal()
     step_through_signal = Signal()
     run_analysis_signal = Signal()
+    flip_board_signal = Signal()
     reset_signal = Signal()
     
     def __init__(self, parent=None):
@@ -94,6 +95,24 @@ class ControlPanelWidget(QWidget):
         
         process_group.setLayout(process_layout)
         layout.addWidget(process_group)
+        
+        # Board Orientation Section
+        orientation_group = QGroupBox("Board Orientation")
+        orientation_layout = QVBoxLayout()
+        
+        self.flip_board_button = QPushButton("Flip Board Orientation")
+        self.flip_board_button.setEnabled(False)
+        self.flip_board_button.setToolTip("Rotate the board 180 degrees (switch between white/black perspective)")
+        self.flip_board_button.clicked.connect(self.flip_board_signal.emit)
+        orientation_layout.addWidget(self.flip_board_button)
+        
+        self.orientation_label = QLabel("Current: Not set")
+        self.orientation_label.setWordWrap(True)
+        self.orientation_label.setStyleSheet("color: gray; font-style: italic;")
+        orientation_layout.addWidget(self.orientation_label)
+        
+        orientation_group.setLayout(orientation_layout)
+        layout.addWidget(orientation_group)
         
         # Manual FEN Entry Section
         fen_group = QGroupBox("Manual Position Entry")
@@ -171,6 +190,26 @@ class ControlPanelWidget(QWidget):
         """
         self.analysis_button.setEnabled(enabled)
     
+    def enable_flip_board_button(self, enabled: bool):
+        """
+        Enable or disable the flip board button.
+        
+        Args:
+            enabled (bool): Whether to enable the button.
+        """
+        self.flip_board_button.setEnabled(enabled)
+    
+    def set_board_orientation(self, orientation: str):
+        """
+        Set the current board orientation display.
+        
+        Args:
+            orientation (str): Current orientation ('white' or 'black').
+        """
+        display_text = "White at bottom" if orientation == 'white' else "Black at bottom"
+        self.orientation_label.setText(f"Current: {display_text}")
+        self.orientation_label.setStyleSheet("color: blue; font-style: italic;")
+    
     def set_status_message(self, message: str):
         """
         Set the status message.
@@ -203,6 +242,9 @@ class ControlPanelWidget(QWidget):
         self.process_button.setEnabled(False)
         self.step_button.setEnabled(False)
         self.analysis_button.setEnabled(False)
+        self.flip_board_button.setEnabled(False)
         self.image_status.setText("No image loaded")
         self.image_status.setStyleSheet("color: gray;")
+        self.orientation_label.setText("Current: Not set")
+        self.orientation_label.setStyleSheet("color: gray; font-style: italic;")
         self.fen_input.clear()

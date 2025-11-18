@@ -170,6 +170,13 @@ class MainWindow(QMainWindow):
         step_action.triggered.connect(self.step_through_pipeline)
         process_menu.addAction(step_action)
         
+        process_menu.addSeparator()
+        
+        flip_action = QAction("&Flip Board Orientation", self)
+        flip_action.setShortcut("Ctrl+F")
+        flip_action.triggered.connect(self.flip_board_orientation)
+        process_menu.addAction(flip_action)
+        
         # Analysis menu
         analysis_menu = menu_bar.addMenu("&Analysis")
         
@@ -210,6 +217,7 @@ class MainWindow(QMainWindow):
         self.control_panel.process_image_signal.connect(self.process_image)
         self.control_panel.step_through_signal.connect(self.step_through_pipeline)
         self.control_panel.run_analysis_signal.connect(self.run_engine_analysis)
+        self.control_panel.flip_board_signal.connect(self.flip_board_orientation)
         self.control_panel.reset_signal.connect(self.reset_application)
         
         # Pipeline widget signals
@@ -347,6 +355,8 @@ class MainWindow(QMainWindow):
                 
                 self.status_bar.showMessage("Processing complete - Review the board position")
                 self.control_panel.enable_analysis_button(True)
+                self.control_panel.enable_flip_board_button(True)
+                self.control_panel.set_board_orientation(self.board_orientation)
                 
                 # Show success message
                 QMessageBox.information(
@@ -398,6 +408,81 @@ class MainWindow(QMainWindow):
             stage_name (str): Name of the selected stage.
         """
         self.status_bar.showMessage(f"Viewing: {stage_name}")
+    
+    def flip_board_orientation(self):
+        """
+        Flip the board orientation (rotate 180 degrees).
+        
+        This allows users to manually correct the board perspective after processing.
+        Flips both the square images and recognition results, then regenerates the FEN.
+        """
+        if self.board_squares is None or self.recognition_results is None:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "Please process an image first before flipping the board."
+            )
+            return
+        
+        self.logger.info("Flipping board orientation")
+        self.status_bar.showMessage("Flipping board orientation...")
+        
+        try:
+            # Flip the squares grid
+            self.board_squares = self.board_detector.flip_board(self.board_squares)
+            
+            # Flip the recognition results (same operation)
+            flipped_results = []
+            for row in reversed(self.recognition_results):
+                flipped_row = list(reversed(row))
+                flipped_results.append(flipped_row)
+            self.recognition_results = flipped_results
+            
+            # Toggle orientation
+            self.board_orientation = 'black' if self.board_orientation == 'white' else 'white'
+            self.logger.info(f"Board orientation now: {self.board_orientation}")
+            
+            # Update control panel orientation display
+            self.control_panel.set_board_orientation(self.board_orientation)
+            
+            # Regenerate FEN with flipped data
+            fen = self.piece_recognizer.results_to_fen(self.recognition_results)
+            
+            if self.board_manager.set_position_from_fen(fen):
+                # Update board reconstruction widget
+                self.board_widget.set_board_state(self.board_manager)
+                self.board_widget.set_recognition_results(self.recognition_results)
+                
+                # Update pipeline widget with flipped squares
+                self.pipeline_widget.set_squares(self.board_squares)
+                self.pipeline_widget.set_recognition_results(self.board_squares, self.recognition_results)
+                
+                self.status_bar.showMessage(f"Board flipped - {self.board_orientation.capitalize()} now at bottom")
+                
+                # Show success message
+                QMessageBox.information(
+                    self,
+                    "Board Flipped",
+                    f"Board orientation flipped successfully!\n\n"
+                    f"Current orientation: {self.board_orientation.capitalize()} at bottom\n\n"
+                    f"You can flip again if needed or run engine analysis."
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    "Failed to update board position after flipping."
+                )
+                self.status_bar.showMessage("Board flip failed")
+        
+        except Exception as e:
+            self.logger.error(f"Error during board flip: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"An error occurred while flipping the board:\n{str(e)}"
+            )
+            self.status_bar.showMessage("Board flip failed")
     
     def run_engine_analysis(self):
         """
@@ -461,6 +546,8 @@ class MainWindow(QMainWindow):
             self.current_image = None
             self.detected_board = None
             self.recognition_results = None
+            self.board_squares = None
+            self.board_orientation = 'white'
             
             # Reset board
             self.board_manager.reset()
