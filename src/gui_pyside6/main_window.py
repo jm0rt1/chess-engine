@@ -333,11 +333,56 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Step 6/7: Recognizing pieces...")
             self.recognition_results = self.piece_recognizer.recognize_board(squares)
             
-            # Detect board orientation
-            self.board_orientation = self.board_detector.detect_board_orientation(
-                squares, self.recognition_results
-            )
-            self.logger.info(f"Board orientation: {self.board_orientation}")
+            # Detect or apply board orientation based on user preference
+            orientation_pref = self.control_panel.get_orientation_preference()
+            
+            if orientation_pref == 'auto':
+                # Use automatic detection
+                detected_orientation = self.board_detector.detect_board_orientation(
+                    squares, self.recognition_results
+                )
+                self.logger.info(f"Physical orientation detected: {detected_orientation}")
+                
+                # If black pieces are at bottom, flip the data to normalize it
+                if detected_orientation == 'black':
+                    self.logger.info("Flipping board data to normalize (black detected at bottom)")
+                    self.board_squares = self.board_detector.flip_board(self.board_squares)
+                    
+                    # Flip recognition results
+                    flipped_results = []
+                    for row in reversed(self.recognition_results):
+                        flipped_row = list(reversed(row))
+                        flipped_results.append(flipped_row)
+                    self.recognition_results = flipped_results
+                    
+                    # Update squares reference for display
+                    squares = self.board_squares
+                
+                # After normalization, always set to white perspective
+                self.board_orientation = 'white'
+                
+            elif orientation_pref == 'white':
+                # User expects white on bottom - no flipping needed
+                self.board_orientation = 'white'
+                self.logger.info(f"Board orientation (manual): white on bottom")
+                
+            else:  # orientation_pref == 'black'
+                # User expects black on bottom - flip the data to normalize it
+                self.logger.info(f"Board orientation (manual): black on bottom - flipping data")
+                self.board_squares = self.board_detector.flip_board(self.board_squares)
+                
+                # Flip recognition results
+                flipped_results = []
+                for row in reversed(self.recognition_results):
+                    flipped_row = list(reversed(row))
+                    flipped_results.append(flipped_row)
+                self.recognition_results = flipped_results
+                
+                # Update squares reference for display
+                squares = self.board_squares
+                
+                # After normalization, set to white perspective
+                self.board_orientation = 'white'
             
             self.pipeline_widget.set_recognition_results(squares, self.recognition_results)
             
