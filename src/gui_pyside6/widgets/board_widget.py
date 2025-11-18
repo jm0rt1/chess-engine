@@ -14,7 +14,13 @@ from PySide6.QtCore import Qt, QRectF, Signal
 from PySide6.QtGui import QColor, QBrush, QPen, QFont, QPixmap, QImage
 import chess
 from typing import Optional, List
+from typing import TYPE_CHECKING
 import numpy as np
+
+if TYPE_CHECKING:
+    # Import only for type checking to avoid runtime coupling
+    from src.chess_engine.board_manager import BoardManager
+    from src.computer_vision.piece_recognizer import RecognitionResult
 
 
 class ClickableSquare(QGraphicsRectItem):
@@ -96,9 +102,9 @@ class BoardReconstructionWidget(QWidget):
             parent: Parent widget.
         """
         super().__init__(parent)
-        
-        self.board_manager = None
-        self.recognition_results = None
+
+        self.board_manager: Optional["BoardManager"] = None
+        self.recognition_results: Optional[List[List["RecognitionResult"]]] = None
         self.correction_mode_enabled = False
         
         self._setup_ui()
@@ -373,7 +379,7 @@ class BoardReconstructionWidget(QWidget):
                 return self.recognition_results[row][col].confidence
         return None
     
-    def set_board_state(self, board_manager):
+    def set_board_state(self, board_manager: "BoardManager") -> None:
         """
         Set the board state to display.
         
@@ -384,7 +390,7 @@ class BoardReconstructionWidget(QWidget):
         self._draw_board()
         self._update_info_displays()
     
-    def set_recognition_results(self, results: List[List]):
+    def set_recognition_results(self, results: List[List["RecognitionResult"]]) -> None:
         """
         Set piece recognition results.
         
@@ -395,7 +401,7 @@ class BoardReconstructionWidget(QWidget):
         self._draw_board()
         self._update_confidence_display()
     
-    def _update_info_displays(self):
+    def _update_info_displays(self) -> None:
         """Update FEN and board state displays."""
         if self.board_manager is None:
             return
@@ -422,7 +428,7 @@ class BoardReconstructionWidget(QWidget):
         
         self.state_display.setPlainText(state_text)
     
-    def _update_confidence_display(self):
+    def _update_confidence_display(self) -> None:
         """Update the confidence display."""
         if self.recognition_results is None:
             return
@@ -470,7 +476,7 @@ class BoardReconstructionWidget(QWidget):
         
         self.confidence_display.setPlainText(confidence_text)
     
-    def clear(self):
+    def clear(self) -> None:
         """Clear the board display."""
         self.board_manager = None
         self.recognition_results = None

@@ -13,7 +13,10 @@ from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QPixmap, QImage, QFont
 import cv2
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Dict, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.computer_vision.piece_recognizer import RecognitionResult
 
 
 class PipelineVisualizationWidget(QWidget):
@@ -44,11 +47,12 @@ class PipelineVisualizationWidget(QWidget):
             parent: Parent widget.
         """
         super().__init__(parent)
-        
-        self.pipeline_stages = {}
-        self.current_stage = None
+
+        # Maps stage name to an image or a named collection of images
+        self.pipeline_stages: Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]] = {}
+        self.current_stage: Optional[str] = None
         self.step_mode = False
-        
+
         self._setup_ui()
     
     def _setup_ui(self):
@@ -341,7 +345,7 @@ class PipelineVisualizationWidget(QWidget):
         self.pipeline_stages["5. Square Segmentation"] = grid_image
         self._update_stage_selector()
     
-    def set_recognition_results(self, squares: List[List[np.ndarray]], results: List[List]):
+    def set_recognition_results(self, squares: List[List[np.ndarray]], results: List[List["RecognitionResult"]]):
         """
         Set piece recognition results.
         
