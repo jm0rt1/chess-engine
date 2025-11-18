@@ -44,6 +44,7 @@ class EngineAnalysisWidget(QWidget):
         self.board_manager = None
         self.threat_analysis = None
         self.best_moves = None
+        self.board_orientation = 'white'  # Track board orientation for coordinate labels
         
         self._setup_ui()
     
@@ -147,15 +148,21 @@ class EngineAnalysisWidget(QWidget):
                 rect.setPen(QPen(Qt.NoPen))
                 scene.addItem(rect)
                 
-                # Draw coordinate labels
+                # Draw coordinate labels (adjust based on board orientation)
                 if col == 0:
-                    rank_label = QGraphicsTextItem(str(8 - row))
+                    if self.board_orientation == 'white':
+                        rank_label = QGraphicsTextItem(str(8 - row))
+                    else:  # black orientation
+                        rank_label = QGraphicsTextItem(str(row + 1))
                     rank_label.setPos(2, row * square_size + 2)
                     rank_label.setDefaultTextColor(QColor(0, 0, 0))
                     scene.addItem(rank_label)
                 
                 if row == 7:
-                    file_label = QGraphicsTextItem(chr(ord('a') + col))
+                    if self.board_orientation == 'white':
+                        file_label = QGraphicsTextItem(chr(ord('a') + col))
+                    else:  # black orientation
+                        file_label = QGraphicsTextItem(chr(ord('h') - col))
                     file_label.setPos(col * square_size + square_size - 15, 
                                      row * square_size + square_size - 20)
                     file_label.setDefaultTextColor(QColor(0, 0, 0))
@@ -416,6 +423,17 @@ class EngineAnalysisWidget(QWidget):
                 moves_text += "\n"
         
         self.moves_text.setPlainText(moves_text)
+        self._draw_best_moves()
+    
+    def set_board_orientation(self, orientation: str):
+        """
+        Set the board orientation for coordinate labeling.
+        
+        Args:
+            orientation (str): Board orientation ('white' or 'black').
+        """
+        self.board_orientation = orientation
+        self._draw_threat_map()  # Redraw to update coordinate labels
         self._draw_best_moves()
     
     def clear(self):
