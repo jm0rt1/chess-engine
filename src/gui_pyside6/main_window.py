@@ -347,6 +347,7 @@ class MainWindow(QMainWindow):
             
             if self.board_manager.set_position_from_fen(fen):
                 # Update board reconstruction widget
+                self.board_widget.set_board_orientation(self.board_orientation)
                 self.board_widget.set_board_state(self.board_manager)
                 self.board_widget.set_recognition_results(self.recognition_results)
                 
@@ -449,9 +450,13 @@ class MainWindow(QMainWindow):
             fen = self.piece_recognizer.results_to_fen(self.recognition_results)
             
             if self.board_manager.set_position_from_fen(fen):
-                # Update board reconstruction widget
+                # Update board reconstruction widget with new orientation
+                self.board_widget.set_board_orientation(self.board_orientation)
                 self.board_widget.set_board_state(self.board_manager)
                 self.board_widget.set_recognition_results(self.recognition_results)
+                
+                # Update analysis widget with new orientation if it has been displayed
+                self.analysis_widget.set_board_orientation(self.board_orientation)
                 
                 # Update pipeline widget with flipped squares
                 self.pipeline_widget.set_squares(self.board_squares)
@@ -509,7 +514,8 @@ class MainWindow(QMainWindow):
             # Get best moves
             best_moves = self.move_suggester.get_best_moves(num_moves=5)
             
-            # Update analysis widget
+            # Update analysis widget with current board orientation
+            self.analysis_widget.set_board_orientation(self.board_orientation)
             self.analysis_widget.set_board_state(self.board_manager)
             self.analysis_widget.set_threat_analysis(threat_summary)
             self.analysis_widget.set_best_moves(best_moves)
@@ -612,7 +618,8 @@ class MainWindow(QMainWindow):
         fen = self.piece_recognizer.results_to_fen(self.recognition_results)
         
         if self.board_manager.set_position_from_fen(fen):
-            # Update board widget
+            # Update board widget with current orientation
+            self.board_widget.set_board_orientation(self.board_orientation)
             self.board_widget.set_board_state(self.board_manager)
             self.board_widget.set_recognition_results(self.recognition_results)
             
