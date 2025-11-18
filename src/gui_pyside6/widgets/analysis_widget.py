@@ -13,7 +13,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QRectF, QLineF, QPointF
 from PySide6.QtGui import QColor, QBrush, QPen, QFont, QPainter
 import chess
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.chess_engine.board_manager import BoardManager
+    from src.chess_engine.move_suggester import MoveEvaluation
 
 
 class EngineAnalysisWidget(QWidget):
@@ -40,11 +44,11 @@ class EngineAnalysisWidget(QWidget):
             parent: Parent widget.
         """
         super().__init__(parent)
-        
-        self.board_manager = None
-        self.threat_analysis = None
-        self.best_moves = None
-        
+
+        self.board_manager: Optional["BoardManager"] = None
+        self.threat_analysis: Optional[str] = None
+        self.best_moves: Optional[List["MoveEvaluation"]] = None
+
         self._setup_ui()
     
     def _setup_ui(self):
@@ -367,7 +371,7 @@ class EngineAnalysisWidget(QWidget):
         line2.setPen(QPen(color, 6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         scene.addItem(line2)
     
-    def set_board_state(self, board_manager):
+    def set_board_state(self, board_manager: "BoardManager") -> None:
         """
         Set the board state.
         
@@ -378,7 +382,7 @@ class EngineAnalysisWidget(QWidget):
         self._draw_threat_map()
         self._draw_best_moves()
     
-    def set_threat_analysis(self, threat_summary: str):
+    def set_threat_analysis(self, threat_summary: str) -> None:
         """
         Set threat analysis results.
         
@@ -389,7 +393,7 @@ class EngineAnalysisWidget(QWidget):
         self.threat_text.setPlainText(threat_summary)
         self._draw_threat_map()
     
-    def set_best_moves(self, best_moves: List):
+    def set_best_moves(self, best_moves: List["MoveEvaluation"]) -> None:
         """
         Set best move suggestions.
         
@@ -418,7 +422,7 @@ class EngineAnalysisWidget(QWidget):
         self.moves_text.setPlainText(moves_text)
         self._draw_best_moves()
     
-    def clear(self):
+    def clear(self) -> None:
         """Clear all analysis displays."""
         self.board_manager = None
         self.threat_analysis = None
