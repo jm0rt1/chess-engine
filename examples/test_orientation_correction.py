@@ -181,7 +181,7 @@ def main():
 1. Run the PySide6 GUI:
    python run_pyside6.py
 
-2. BEFORE loading an image, select the expected orientation:
+2. Select the expected orientation (can be done before or after loading):
    • If you know the image has white on bottom: select "White on Bottom"
    • If you know the image has black on bottom: select "Black on Bottom"
    • If unsure: keep "Auto-detect" (default)
