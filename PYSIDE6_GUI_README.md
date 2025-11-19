@@ -101,7 +101,7 @@ See `MANUAL_ORIENTATION_FEATURE.md` for complete documentation.
 
 #### Control Panel
 - **Load Image**: Open file dialog to select chess board images
-- **Manual Board Orientation Selector**: Choose expected orientation BEFORE processing
+- **Manual Board Orientation Selector**: Choose expected orientation before processing
   - **Auto-detect** (default): System determines orientation automatically
   - **White on Bottom**: For images with white pieces at bottom
   - **Black on Bottom**: For images with black pieces at bottom (auto-flips during processing)
