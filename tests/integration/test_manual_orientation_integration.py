@@ -108,7 +108,6 @@ class TestManualOrientationIntegration(unittest.TestCase):
     
     def test_manual_white_selection_no_flip(self):
         """Test that manual 'white' selection doesn't flip data."""
-        squares = self.create_test_squares_black_at_bottom()
         results = self.create_test_recognition_black_at_bottom()
         
         # Simulate what happens when user selects "White on Bottom"
