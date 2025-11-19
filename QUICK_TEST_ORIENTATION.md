@@ -62,7 +62,7 @@ python run_pyside6.py
 
 **Steps:**
 1. Launch GUI: `python run_pyside6.py`
-2. **BEFORE processing**: Change orientation selector to "Black on Bottom"
+2. Change orientation selector to "Black on Bottom" (before clicking Process)
 3. Load a chess board image with black pieces at bottom
 4. Click "Process Image"
 5. **Expected**: Board displays correctly WITH automatic flip
