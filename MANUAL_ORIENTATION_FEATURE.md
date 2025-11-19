@@ -19,7 +19,7 @@ When the automatic detection fails, the data is processed in the wrong orientati
 
 ## Solution
 
-Added a manual orientation selector in the Control Panel that allows users to explicitly specify the expected board orientation **before** processing the image.
+Added a manual orientation selector in the Control Panel that allows users to explicitly specify the expected board orientation before clicking "Process Image".
 
 ### User Interface Changes
 
