@@ -73,7 +73,6 @@ class TestManualOrientationIntegration(unittest.TestCase):
             squares.append(row_squares)
         
         # This should NOT require flipping
-        orientation_pref = 'auto'
         detected = self.detector.detect_board_orientation(squares, None)
         
         # Should detect white at bottom
