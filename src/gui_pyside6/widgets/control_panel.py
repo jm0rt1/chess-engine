@@ -6,7 +6,7 @@ This module provides the control panel with buttons for various actions.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QLabel,
-    QGroupBox, QLineEdit, QTextEdit
+    QGroupBox, QLineEdit, QTextEdit, QComboBox, QHBoxLayout
 )
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont
@@ -99,6 +99,24 @@ class ControlPanelWidget(QWidget):
         # Board Orientation Section
         orientation_group = QGroupBox("Board Orientation")
         orientation_layout = QVBoxLayout()
+        
+        # Manual orientation selector
+        selector_layout = QHBoxLayout()
+        selector_label = QLabel("Expected:")
+        selector_layout.addWidget(selector_label)
+        
+        self.orientation_selector = QComboBox()
+        self.orientation_selector.addItem("Auto-detect", "auto")
+        self.orientation_selector.addItem("White on Bottom", "white")
+        self.orientation_selector.addItem("Black on Bottom", "black")
+        self.orientation_selector.setToolTip(
+            "Select the expected board orientation:\n"
+            "• Auto-detect: Let the system determine orientation\n"
+            "• White on Bottom: Force white pieces at bottom\n"
+            "• Black on Bottom: Force black pieces at bottom"
+        )
+        selector_layout.addWidget(self.orientation_selector)
+        orientation_layout.addLayout(selector_layout)
         
         self.flip_board_button = QPushButton("Flip Board Orientation")
         self.flip_board_button.setEnabled(False)
@@ -237,6 +255,27 @@ class ControlPanelWidget(QWidget):
         """
         self.fen_input.setText(fen)
     
+    def get_orientation_preference(self) -> str:
+        """
+        Get the user's orientation preference.
+        
+        Returns:
+            str: 'auto', 'white', or 'black'
+        """
+        return self.orientation_selector.currentData()
+    
+    def set_orientation_preference(self, orientation: str):
+        """
+        Set the orientation preference.
+        
+        Args:
+            orientation (str): 'auto', 'white', or 'black'
+        """
+        for i in range(self.orientation_selector.count()):
+            if self.orientation_selector.itemData(i) == orientation:
+                self.orientation_selector.setCurrentIndex(i)
+                break
+    
     def reset(self):
         """Reset the control panel to initial state."""
         self.process_button.setEnabled(False)
@@ -247,4 +286,5 @@ class ControlPanelWidget(QWidget):
         self.image_status.setStyleSheet("color: gray;")
         self.orientation_label.setText("Current: Not set")
         self.orientation_label.setStyleSheet("color: gray; font-style: italic;")
+        self.orientation_selector.setCurrentIndex(0)  # Reset to Auto-detect
         self.fen_input.clear()

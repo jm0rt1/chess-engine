@@ -61,7 +61,13 @@ class ClickableSquare(QGraphicsRectItem):
     def mousePressEvent(self, event):
         """Handle mouse click."""
         if event.button() == Qt.LeftButton:
-            square_name = chess.square_name(chess.square(self.col, 7 - self.row))
+            # Calculate square name based on board orientation
+            if self.widget.board_orientation == 'white':
+                # White perspective: row 0 = rank 8, col 0 = file a
+                square_name = chess.square_name(chess.square(self.col, 7 - self.row))
+            else:
+                # Black perspective: row 0 = rank 1, col 0 = file h
+                square_name = chess.square_name(chess.square(7 - self.col, self.row))
             self.widget.on_square_clicked(square_name, self.row, self.col)
         super().mousePressEvent(event)
 
@@ -456,9 +462,15 @@ class BoardReconstructionWidget(QWidget):
                 all_confidences.append(confidence)
                 
                 if confidence < 0.7:
-                    square_name = chess.square_name(
-                        chess.square(col_idx, 7 - row_idx)
-                    )
+                    # Calculate square name based on board orientation
+                    if self.board_orientation == 'white':
+                        square_name = chess.square_name(
+                            chess.square(col_idx, 7 - row_idx)
+                        )
+                    else:
+                        square_name = chess.square_name(
+                            chess.square(7 - col_idx, row_idx)
+                        )
                     if result.piece_type is None:
                         piece_name = "Unknown"
                     elif result.piece_type.name == "EMPTY":

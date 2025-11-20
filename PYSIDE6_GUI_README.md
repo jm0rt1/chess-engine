@@ -63,12 +63,53 @@ The GUI displays every stage of the image processing workflow:
   - Tactical themes
   - Strategic explanations
 
-### 4. Interactive Controls
+### 4. Board Orientation Management
+
+The system provides comprehensive board orientation control to handle images captured from any perspective:
+
+#### Automatic Orientation Detection
+- Uses heuristics to detect board orientation:
+  - Corner square color analysis
+  - Piece position analysis
+- Automatically normalizes data when black pieces detected at bottom
+
+#### Manual Orientation Selection (NEW)
+- **Control Panel Dropdown**: Select expected orientation before processing
+- **Three Options**:
+  1. **Auto-detect**: Let system determine orientation (uses heuristics)
+  2. **White on Bottom**: Explicitly declare white pieces at bottom
+  3. **Black on Bottom**: Explicitly declare black pieces at bottom
+- **Automatic Normalization**: System flips data during processing when needed
+- **No Reload Required**: Change orientation and re-process without reloading image
+- **Solves Common Issue**: Fixes problem with images from black's perspective
+
+#### Post-Processing Flip
+- **Flip Board Orientation Button**: Rotate display 180° after processing
+- **Keyboard Shortcut**: Ctrl+F
+- **Coordinate Updates**: Labels automatically adjust when flipped
+- **Multiple Flips**: Can flip multiple times to find correct orientation
+
+#### Best Practices
+- Use manual selection when you know the image orientation
+- Use "Black on Bottom" for images captured from black's perspective
+- Use "Auto-detect" for standard images or when orientation is unknown
+- If auto-detect fails, change dropdown and re-process
+
+See `MANUAL_ORIENTATION_FEATURE.md` for complete documentation.
+
+### 5. Interactive Controls
 
 #### Control Panel
 - **Load Image**: Open file dialog to select chess board images
+- **Manual Board Orientation Selector**: Choose expected orientation before processing
+  - **Auto-detect** (default): System determines orientation automatically
+  - **White on Bottom**: For images with white pieces at bottom
+  - **Black on Bottom**: For images with black pieces at bottom (auto-flips during processing)
+  - Fixes issues with images captured from black's perspective
+  - Can change and re-process without reloading image
 - **Process Image**: Run complete pipeline automatically
 - **Step Through Pipeline**: Navigate through processing stages one-by-one
+- **Flip Board Orientation**: Rotate board 180° after processing (Ctrl+F)
 - **Run Engine Analysis**: Execute threat analysis and move suggestions
 - **Manual FEN Entry**: Direct position input for testing
 - **Reset Application**: Clear all data and start fresh
@@ -80,6 +121,7 @@ The GUI displays every stage of the image processing workflow:
 - **Process Menu**:
   - Process Image (Ctrl+P)
   - Step Through Pipeline (Ctrl+S)
+  - Flip Board Orientation (Ctrl+F)
 - **Analysis Menu**:
   - Run Engine Analysis (Ctrl+E)
 - **Help Menu**:
@@ -451,6 +493,17 @@ manager.export_feedback(Path('my_feedback.json'))
 8. **Export Capabilities**: Save analysis as images/PDF
 9. **Machine Learning Integration**: Use collected feedback to train a neural network for piece recognition
 10. **Batch Correction**: Correct multiple pieces at once
+
+## Related Documentation
+
+For detailed information about specific features, see:
+
+- **Manual Board Orientation**: `MANUAL_ORIENTATION_FEATURE.md` - Complete guide to manual orientation selection
+- **Quick Test Guide**: `QUICK_TEST_ORIENTATION.md` - Step-by-step testing scenarios for orientation feature
+- **Board Orientation Demo**: `examples/test_orientation_correction.py` - Demonstration script
+- **Board Flip Feature**: `BOARD_ORIENTATION_FEATURE.md` - Coordinate label flipping documentation
+- **Piece Correction**: `PIECE_CORRECTION_FEATURE.md` - Interactive piece correction guide
+- **Model Retraining**: `RETRAINING_GUIDE.md` - How to retrain the piece recognizer
 
 ## Technical Details
 
