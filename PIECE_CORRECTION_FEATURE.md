@@ -95,7 +95,7 @@ MainWindow.on_piece_corrected()
 2. Update recognition results
 3. Regenerate FEN
 4. Refresh board display
-5. Show confirmation message
+5. Update status bar (no popup for faster workflow)
 ```
 
 ### Feedback Data Structure

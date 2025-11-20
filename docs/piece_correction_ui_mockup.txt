@@ -77,18 +77,15 @@ WHEN USER CLICKS ON A SQUARE (e.g., E4):
 
 
 AFTER CORRECTION:
-╔═══════════════════════════════════════════════════════════════╗
-║ Piece Corrected                                               ║
-╠═══════════════════════════════════════════════════════════════╣
-║                                                               ║
-║ Successfully corrected piece on E4!                           ║
-║                                                               ║
-║ The board position has been updated.                          ║
-║ Total corrections in this session: 3                          ║
-║                                                               ║
-║                    [OK]                                       ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
+(No popup - board updates immediately!)
+
+Status bar shows:
+╠═══════════════════════════╩════════════════════════════════════════════════════╣
+║ Status: ✓ Piece corrected on E4 - Total corrections: 3                         ║
+╚═════════════════════════════════════════════════════════════════════════════════╝
+
+This message is displayed for 5 seconds, allowing the user to continue
+correcting other pieces immediately without clicking through popups.
 
 
 FEEDBACK DATA STORED IN: output/piece_recognition_feedback.json
