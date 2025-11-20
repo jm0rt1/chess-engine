@@ -670,19 +670,12 @@ class MainWindow(QMainWindow):
             self.board_widget.set_board_state(self.board_manager)
             self.board_widget.set_recognition_results(self.recognition_results)
             
-            # Show feedback stats
+            # Show feedback stats in status bar (removed popup for faster workflow)
             stats = self.feedback_manager.get_correction_statistics()
             self.status_bar.showMessage(
-                f"Piece corrected on {square_name.upper()} - "
-                f"Total corrections: {stats['total_corrections']}"
-            )
-            
-            QMessageBox.information(
-                self,
-                "Piece Corrected",
-                f"Successfully corrected piece on {square_name.upper()}!\n\n"
-                f"The board position has been updated.\n"
-                f"Total corrections in this session: {stats['total_corrections']}"
+                f"✓ Piece corrected on {square_name.upper()} - "
+                f"Total corrections: {stats['total_corrections']}",
+                5000  # Show for 5 seconds
             )
         else:
             QMessageBox.critical(
