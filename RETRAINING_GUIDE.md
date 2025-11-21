@@ -98,6 +98,9 @@ When you correct a piece, the system saves:
 - **Confidence Score**: How confident the original prediction was
 - **Board Orientation**: Which way the board faced
 - **Timestamp**: When the correction was made
+- **Session ID**: Unique identifier for this labeling session
+- **Image Hash**: Fingerprint of the source image for deduplication
+- **Active Status**: Whether this is the current correction (not superseded)
 
 ### Storage Location
 
@@ -110,12 +113,29 @@ output/
     └── ...
 ```
 
+### Automatic Deduplication
+
+**Important:** If you correct the same square multiple times, the system automatically handles it:
+- Old corrections are marked as "superseded" (inactive)
+- Only the latest correction is used for training
+- All corrections are kept for audit purposes
+
+This ensures clean training data even if you change your mind!
+
+**Example:**
+```
+1. User corrects e4 as "white knight"  → Stored (active)
+2. User realizes mistake, corrects e4 as "white bishop" → Previous marked inactive, new stored (active)
+3. Training uses only: white bishop for e4
+```
+
 ### Minimum Recommendations
 
 For effective retraining:
 - **Minimum**: 3-5 corrections per piece type
 - **Recommended**: 10-20 corrections per piece type
 - **Best**: 30+ corrections covering various lighting/angles
+- **Note**: It's OK to change your mind - the system handles duplicate corrections!
 
 ## Retraining the Model
 
@@ -153,9 +173,12 @@ The system:
 
 Shows:
 - Total corrections made
+- **Active corrections** (currently used for training)
+- **Superseded corrections** (old versions that were replaced)
 - Average original confidence
 - Misclassification rate
 - Breakdown by piece type
+- **Corrections by session** (which labeling sessions contributed)
 
 ### Programmatic Analysis
 
@@ -184,6 +207,57 @@ for fb in misclassified:
 knight_feedback = manager.get_feedback_by_piece_type(PieceType.WHITE_KNIGHT)
 print(f"Knight corrections: {len(knight_feedback)}")
 ```
+
+## Session Tracking and Deduplication
+
+### What is Session Tracking?
+
+Every time you work with the application, you're in a unique **labeling session**. The system:
+- Automatically assigns a session ID (e.g., `session_20241121_143025_a7b3f2e1`)
+- Groups all corrections from that session together
+- Allows you to analyze which sessions were most helpful
+
+### How Deduplication Works
+
+**Problem:** What if you correct the same square twice in the same image?
+
+**Solution:** The system automatically handles this!
+- When you correct e4 as "white knight" → Stored (active)
+- If you change your mind and correct e4 as "white bishop" → Old entry marked inactive, new one active
+- Training uses only the latest correction
+
+**Key Points:**
+- ✅ It's safe to change your mind on corrections
+- ✅ Only the latest correction for each square is used for training
+- ✅ Old corrections are kept for audit/history
+- ✅ Same square in different images are kept separate (not deduplicated)
+
+### Analyzing Sessions
+
+**Get Session Summary:**
+```python
+manager = FeedbackManager()
+summary = manager.get_session_summary()
+
+for session_id, info in summary.items():
+    print(f"Session: {session_id}")
+    print(f"  Active corrections: {info['active_count']}")
+    print(f"  Total corrections: {info['total_count']}")
+    print(f"  Time range: {info['first_timestamp']} to {info['last_timestamp']}")
+```
+
+**Filter by Session:**
+```python
+# Get all corrections from a specific session
+session_feedback = manager.get_feedback_by_session('session_20241121_143025_a7b3f2e1')
+print(f"This session contributed {len(session_feedback)} corrections")
+```
+
+### Technical Details
+
+For detailed technical information about the session tracking and deduplication system, see:
+- [`docs/training-pipeline.md`](docs/training-pipeline.md) - Complete technical documentation
+- [`tests/computer_vision/test_feedback_deduplication.py`](tests/computer_vision/test_feedback_deduplication.py) - Test examples
 
 ## Best Practices
 
@@ -216,12 +290,14 @@ print(f"Knight corrections: {len(knight_feedback)}")
 - Clear feedback data frequently
 - Only correct one type of piece
 - Ignore orientation information
+- Worry about making correction mistakes - the system handles duplicates!
 
 ✅ **Do**:
 - Collect diverse corrections
 - Keep feedback data long-term
 - Correct all types of errors
 - Review statistics regularly
+- Feel free to change your mind on corrections - only the latest is used
 
 ## Programmatic Usage
 
