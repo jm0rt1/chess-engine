@@ -2,10 +2,13 @@
 Feedback Manager for Piece Recognition.
 
 This module manages user feedback on piece recognition for future model training.
+Includes session tracking and deduplication to ensure clean training data.
 """
 
 import json
 import logging
+import hashlib
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -28,6 +31,10 @@ class PieceFeedback:
         timestamp (str): ISO format timestamp of feedback.
         square_image_path (Optional[str]): Path to saved square image for retraining.
         board_orientation (Optional[str]): Board orientation ('white' or 'black' facing user).
+        session_id (Optional[str]): Unique identifier for the labeling session.
+        unique_key (Optional[str]): Unique key combining image_hash and square_name for deduplication.
+        image_hash (Optional[str]): Hash of the source image for identification.
+        is_active (bool): Whether this feedback is currently active (not superseded).
     """
     
     def __init__(
@@ -38,7 +45,11 @@ class PieceFeedback:
         user_correction: PieceType,
         timestamp: Optional[str] = None,
         square_image_path: Optional[str] = None,
-        board_orientation: Optional[str] = None
+        board_orientation: Optional[str] = None,
+        session_id: Optional[str] = None,
+        unique_key: Optional[str] = None,
+        image_hash: Optional[str] = None,
+        is_active: bool = True
     ):
         """
         Initialize a PieceFeedback instance.
@@ -51,6 +62,10 @@ class PieceFeedback:
             timestamp: Optional timestamp (defaults to now).
             square_image_path: Optional path to square image file.
             board_orientation: Optional board orientation ('white' or 'black').
+            session_id: Optional session identifier.
+            unique_key: Optional unique key for deduplication.
+            image_hash: Optional hash of source image.
+            is_active: Whether this feedback is active (default True).
         """
         self.square_name = square_name
         self.original_prediction = original_prediction
@@ -59,6 +74,10 @@ class PieceFeedback:
         self.timestamp = timestamp or datetime.now().isoformat()
         self.square_image_path = square_image_path
         self.board_orientation = board_orientation
+        self.session_id = session_id
+        self.unique_key = unique_key
+        self.image_hash = image_hash
+        self.is_active = is_active
     
     def to_dict(self) -> Dict:
         """
@@ -74,7 +93,11 @@ class PieceFeedback:
             'user_correction': self.user_correction.name if self.user_correction else None,
             'timestamp': self.timestamp,
             'square_image_path': self.square_image_path,
-            'board_orientation': self.board_orientation
+            'board_orientation': self.board_orientation,
+            'session_id': self.session_id,
+            'unique_key': self.unique_key,
+            'image_hash': self.image_hash,
+            'is_active': self.is_active
         }
     
     @staticmethod
@@ -103,7 +126,11 @@ class PieceFeedback:
             user_correction=user_corr,
             timestamp=data.get('timestamp'),
             square_image_path=data.get('square_image_path'),
-            board_orientation=data.get('board_orientation')
+            board_orientation=data.get('board_orientation'),
+            session_id=data.get('session_id'),
+            unique_key=data.get('unique_key'),
+            image_hash=data.get('image_hash'),
+            is_active=data.get('is_active', True)  # Default to True for backward compatibility
         )
 
 
@@ -112,20 +139,24 @@ class FeedbackManager:
     Manages collection and storage of piece recognition feedback.
     
     This class stores user corrections to piece recognition, which can
-    be used to fine-tune or retrain the recognition model.
+    be used to fine-tune or retrain the recognition model. Includes session
+    tracking and deduplication to ensure clean training data.
     
     Attributes:
         feedback_file (Path): Path to feedback storage file.
         logger (logging.Logger): Logger instance.
-        feedback_data (List[PieceFeedback]): Current session feedback.
+        feedback_data (List[PieceFeedback]): All feedback entries.
+        session_id (str): Unique identifier for the current labeling session.
+        current_image_hash (Optional[str]): Hash of the currently loaded image.
     """
     
-    def __init__(self, feedback_file: Optional[Path] = None):
+    def __init__(self, feedback_file: Optional[Path] = None, session_id: Optional[str] = None):
         """
         Initialize the FeedbackManager.
         
         Args:
             feedback_file: Path to feedback JSON file. If None, uses default.
+            session_id: Optional session ID. If None, generates a new unique ID.
         """
         self.logger = logging.getLogger(__name__)
         
@@ -138,10 +169,26 @@ class FeedbackManager:
         self.feedback_file = Path(feedback_file)
         self.feedback_data: List[PieceFeedback] = []
         
+        # Generate or use provided session ID
+        self.session_id = session_id or self._generate_session_id()
+        self.current_image_hash: Optional[str] = None
+        
         # Load existing feedback if file exists
         self._load_feedback()
         
         self.logger.info(f"FeedbackManager initialized with file: {self.feedback_file}")
+        self.logger.info(f"Session ID: {self.session_id}")
+    
+    def _generate_session_id(self) -> str:
+        """
+        Generate a unique session identifier.
+        
+        Returns:
+            str: Unique session ID combining timestamp and UUID.
+        """
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_suffix = str(uuid.uuid4())[:8]
+        return f"session_{timestamp}_{unique_suffix}"
     
     def _load_feedback(self):
         """Load existing feedback from file."""
@@ -178,6 +225,50 @@ class FeedbackManager:
             self.logger.info(f"Saved {len(self.feedback_data)} feedback entries")
         except Exception as e:
             self.logger.error(f"Error saving feedback: {e}", exc_info=True)
+    
+    def set_current_image(self, image: np.ndarray):
+        """
+        Set the current image being processed and compute its hash.
+        
+        This should be called when a new image is loaded to establish
+        the context for subsequent feedback entries.
+        
+        Args:
+            image: The chess board image being processed.
+        """
+        self.current_image_hash = self._compute_image_hash(image)
+        self.logger.info(f"Current image hash set: {self.current_image_hash[:16]}...")
+    
+    def _compute_image_hash(self, image: np.ndarray) -> str:
+        """
+        Compute a hash of an image for unique identification.
+        
+        Args:
+            image: Image array to hash.
+            
+        Returns:
+            str: SHA256 hash of the image.
+        """
+        # Use a small version of the image for consistent hashing
+        small = cv2.resize(image, (64, 64))
+        image_bytes = small.tobytes()
+        return hashlib.sha256(image_bytes).hexdigest()
+    
+    def _compute_unique_key(self, image_hash: str, square_name: str) -> str:
+        """
+        Compute a unique key for deduplication.
+        
+        Combines image hash and square name to uniquely identify a specific
+        square in a specific image.
+        
+        Args:
+            image_hash: Hash of the source image.
+            square_name: Chess square name (e.g., 'e4').
+            
+        Returns:
+            str: Unique key for this feedback entry.
+        """
+        return f"{image_hash}_{square_name}"
     
     def _save_square_image(self, square_image: np.ndarray, square_name: str) -> Optional[str]:
         """
@@ -219,7 +310,10 @@ class FeedbackManager:
         board_orientation: Optional[str] = None
     ):
         """
-        Add a new piece of feedback.
+        Add a new piece of feedback with deduplication.
+        
+        If feedback for the same square in the same image already exists,
+        the old entry is marked as inactive and the new one replaces it.
         
         Args:
             square_name: Chess square name (e.g., 'e4').
@@ -234,13 +328,39 @@ class FeedbackManager:
         if square_image is not None:
             square_image_path = self._save_square_image(square_image, square_name)
         
+        # Compute unique key for deduplication
+        image_hash = self.current_image_hash
+        unique_key = None
+        if image_hash:
+            unique_key = self._compute_unique_key(image_hash, square_name)
+            
+            # Check for existing feedback with same unique key
+            superseded_count = 0
+            for existing_fb in self.feedback_data:
+                if existing_fb.unique_key == unique_key and existing_fb.is_active:
+                    # Mark old entry as inactive (superseded)
+                    existing_fb.is_active = False
+                    superseded_count += 1
+                    self.logger.info(
+                        f"Superseding previous feedback for {square_name} "
+                        f"(was: {existing_fb.user_correction.name if existing_fb.user_correction else 'None'})"
+                    )
+            
+            if superseded_count > 0:
+                self.logger.info(f"Marked {superseded_count} previous entries as superseded")
+        
+        # Create new feedback entry
         feedback = PieceFeedback(
             square_name=square_name,
             original_prediction=original_prediction,
             original_confidence=original_confidence,
             user_correction=user_correction,
             square_image_path=square_image_path,
-            board_orientation=board_orientation
+            board_orientation=board_orientation,
+            session_id=self.session_id,
+            unique_key=unique_key,
+            image_hash=image_hash,
+            is_active=True
         )
         
         self.feedback_data.append(feedback)
@@ -248,7 +368,8 @@ class FeedbackManager:
         
         self.logger.info(
             f"Added feedback for {square_name}: "
-            f"{original_prediction} -> {user_correction}"
+            f"{original_prediction} -> {user_correction} "
+            f"(session: {self.session_id[:16]}...)"
         )
     
     def get_feedback_count(self) -> int:
@@ -260,39 +381,112 @@ class FeedbackManager:
         """
         return len(self.feedback_data)
     
-    def get_correction_statistics(self) -> Dict:
+    def get_correction_statistics(self, active_only: bool = True) -> Dict:
         """
         Get statistics about corrections.
+        
+        Args:
+            active_only: If True, only counts active (non-superseded) feedback.
         
         Returns:
             Dict: Statistics including total corrections, by piece type, etc.
         """
-        if not self.feedback_data:
+        # Filter feedback based on active_only flag
+        feedback_to_analyze = [fb for fb in self.feedback_data if not active_only or fb.is_active]
+        
+        if not feedback_to_analyze:
             return {
                 'total_corrections': 0,
+                'active_corrections': 0,
+                'superseded_corrections': 0,
                 'by_piece_type': {},
+                'by_session': {},
                 'avg_original_confidence': 0.0
             }
         
         stats = {
             'total_corrections': len(self.feedback_data),
+            'active_corrections': len([fb for fb in self.feedback_data if fb.is_active]),
+            'superseded_corrections': len([fb for fb in self.feedback_data if not fb.is_active]),
             'by_piece_type': {},
+            'by_session': {},
             'avg_original_confidence': 0.0
         }
         
-        # Count by piece type
-        for fb in self.feedback_data:
+        # Count by piece type (active only)
+        for fb in feedback_to_analyze:
             piece_name = fb.user_correction.name if fb.user_correction else 'UNKNOWN'
             stats['by_piece_type'][piece_name] = stats['by_piece_type'].get(piece_name, 0) + 1
         
-        # Average confidence of corrected predictions
-        confidences = [fb.original_confidence for fb in self.feedback_data]
-        stats['avg_original_confidence'] = sum(confidences) / len(confidences)
+        # Count by session (active only)
+        for fb in feedback_to_analyze:
+            session = fb.session_id or 'unknown'
+            stats['by_session'][session] = stats['by_session'].get(session, 0) + 1
+        
+        # Average confidence of corrected predictions (active only)
+        confidences = [fb.original_confidence for fb in feedback_to_analyze]
+        if confidences:
+            stats['avg_original_confidence'] = sum(confidences) / len(confidences)
         
         return stats
     
-    def clear_feedback(self):
-        """Clear all feedback data."""
+    def get_feedback_by_session(self, session_id: str) -> List[PieceFeedback]:
+        """
+        Get all feedback for a specific session.
+        
+        Args:
+            session_id: The session identifier to filter by.
+            
+        Returns:
+            List[PieceFeedback]: Feedback entries for the specified session.
+        """
+        return [fb for fb in self.feedback_data if fb.session_id == session_id]
+    
+    def get_session_summary(self) -> Dict:
+        """
+        Get a summary of all sessions with feedback counts.
+        
+        Returns:
+            Dict: Session IDs mapped to counts and timestamps.
+        """
+        sessions = {}
+        for fb in self.feedback_data:
+            session = fb.session_id or 'unknown'
+            if session not in sessions:
+                sessions[session] = {
+                    'total_count': 0,
+                    'active_count': 0,
+                    'first_timestamp': fb.timestamp,
+                    'last_timestamp': fb.timestamp
+                }
+            
+            sessions[session]['total_count'] += 1
+            if fb.is_active:
+                sessions[session]['active_count'] += 1
+            
+            # Update timestamps
+            if fb.timestamp < sessions[session]['first_timestamp']:
+                sessions[session]['first_timestamp'] = fb.timestamp
+            if fb.timestamp > sessions[session]['last_timestamp']:
+                sessions[session]['last_timestamp'] = fb.timestamp
+        
+        return sessions
+    
+    def clear_feedback(self, clear_images: bool = True):
+        """
+        Clear all feedback data.
+        
+        Args:
+            clear_images: If True, also deletes training images.
+        """
+        if clear_images:
+            # Delete training images directory
+            images_dir = self.feedback_file.parent / 'training_images'
+            if images_dir.exists():
+                import shutil
+                shutil.rmtree(images_dir)
+                self.logger.info("Training images directory cleared")
+        
         self.feedback_data = []
         if self.feedback_file.exists():
             self.feedback_file.unlink()
@@ -313,9 +507,12 @@ class FeedbackManager:
         except Exception as e:
             self.logger.error(f"Error exporting feedback: {e}", exc_info=True)
     
-    def get_training_data(self) -> List[tuple]:
+    def get_training_data(self, active_only: bool = True) -> List[tuple]:
         """
         Get training data from feedback for model retraining.
+        
+        Args:
+            active_only: If True, only returns active (non-superseded) feedback.
         
         Returns:
             List[tuple]: List of (image, label) tuples where image is np.ndarray
@@ -324,7 +521,10 @@ class FeedbackManager:
         training_data = []
         base_dir = self.feedback_file.parent
         
-        for fb in self.feedback_data:
+        # Filter feedback based on active_only flag
+        feedback_to_process = [fb for fb in self.feedback_data if not active_only or fb.is_active]
+        
+        for fb in feedback_to_process:
             if fb.square_image_path:
                 image_path = base_dir / fb.square_image_path
                 if image_path.exists():
@@ -335,7 +535,8 @@ class FeedbackManager:
                     except Exception as e:
                         self.logger.warning(f"Failed to load image {image_path}: {e}")
         
-        self.logger.info(f"Retrieved {len(training_data)} training samples from feedback")
+        active_str = "active " if active_only else ""
+        self.logger.info(f"Retrieved {len(training_data)} {active_str}training samples from feedback")
         return training_data
     
     def get_feedback_by_piece_type(self, piece_type: PieceType) -> List[PieceFeedback]:

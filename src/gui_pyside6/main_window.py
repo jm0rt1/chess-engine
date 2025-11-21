@@ -307,6 +307,9 @@ class MainWindow(QMainWindow):
         self.logger.info("Starting image processing pipeline")
         self.status_bar.showMessage("Processing image...")
         
+        # Set current image in feedback manager for session tracking
+        self.feedback_manager.set_current_image(self.current_image)
+        
         try:
             # Step 1: Preprocess image
             self.status_bar.showMessage("Step 1/7: Preprocessing...")
