@@ -14,7 +14,6 @@ import tempfile
 import shutil
 from pathlib import Path
 import numpy as np
-import cv2
 
 from src.computer_vision.feedback_manager import FeedbackManager, PieceFeedback
 from src.computer_vision.piece_recognizer import PieceType

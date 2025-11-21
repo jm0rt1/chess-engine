@@ -5,16 +5,17 @@ This module manages user feedback on piece recognition for future model training
 Includes session tracking and deduplication to ensure clean training data.
 """
 
+import base64
+import hashlib
 import json
 import logging
-import hashlib
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
-import numpy as np
+
 import cv2
-import base64
+import numpy as np
 
 from src.computer_vision.piece_recognizer import PieceType
 
